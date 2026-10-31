@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agenda - Dinsdag</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0 auto;
+        padding: 24px;
+        max-width: 760px;
+        color: #1f2937;
+        background: #eef2f7;
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        color: #183153;
+      }
+
+      .dagen-navigatie {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .dagen-navigatie a {
+        padding: 10px 14px;
+        border: 1px solid #d6deea;
+        border-radius: 8px;
+        background: #fff;
+        color: #183153;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        transition:
+          background-color 0.2s,
+          color 0.2s;
+      }
+
+      .dagen-navigatie a:hover,
+      .dagen-navigatie a:focus-visible {
+        background: #183153;
+        color: #fff;
+      }
+
+      .agenda-container {
+        position: relative;
+        min-height: 600px;
+        padding: 16px;
+        background: #f5f8fc;
+        border: 1px solid #d6deea;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgb(24 49 83 / 8%);
+      }
+
+      ul {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      li {
+        position: relative;
+        padding: 14px 16px;
+        border: 1px solid #dce5f0;
+        border-left: 4px solid #4f83cc;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 2px 6px rgb(24 49 83 / 6%);
+        font-size: 15px;
+        line-height: 1.4;
+      }
+
+      li:nth-child(1) {
+        background: #e8f1ff;
+        border-left-color: #3978c5;
+      }
+
+      li:nth-child(2) {
+        background: #e5f6ed;
+        border-left-color: #319263;
+      }
+
+      li:nth-child(3) {
+        background: #fff0df;
+        border-left-color: #d8872f;
+      }
+
+      li:nth-child(4) {
+        background: #f0eaff;
+        border-left-color: #7956bd;
+      }
+
+      li:nth-child(5) {
+        background: #fff8d9;
+        border-left-color: #c29a18;
+      }
+
+      li:nth-child(6) {
+        background: #ffe8ec;
+        border-left-color: #d64d69;
+      }
+
+      li:nth-child(7) {
+        background: #def5f4;
+        border-left-color: #258d89;
+      }
+
+      li:nth-child(8) {
+        background: #fce8d9;
+        border-left-color: #cc7040;
+      }
+
+      li:nth-child(9) {
+        background: #e9edf2;
+        border-left-color: #64748b;
+      }
+
+      li:nth-child(10) {
+        background: #e8f4d9;
+        border-left-color: #719b35;
+      }
+
+      li:nth-child(11) {
+        background: #f9e5f7;
+        border-left-color: #a64c9a;
+      }
+
+      #tijdswijzer {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: #e5484d;
+        z-index: 10;
+        top: 0;
+        visibility: hidden;
+      }
+
+      #tijdswijzer.is-visible {
+        visibility: visible;
+      }
+
+      li.planning-actief {
+        position: relative;
+        z-index: 1;
+        transform: scale(1.015);
+        box-shadow: 0 4px 12px rgb(24 49 83 / 18%);
+      }
+
+      @media (max-width: 520px) {
+        body {
+          padding: 16px;
+        }
+
+        .agenda-container {
+          padding: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Agenda</h1>
+    <nav class="dagen-navigatie" aria-label="Dagen van de week">
+      <a href="index.html?dag=maandag">Maandag</a>
+      <a href="dinsdag.html">Dinsdag</a>
+      <a href="woensdag.html">Woensdag</a>
+      <a href="donderdag.html">Donderdag</a>
+      <a href="vrijdag.html" aria-current="page">Vrijdag</a>
+      <a href="zaterdag.html">Zaterdag</a>
+      <a href="zondag.html">Zondag</a>
+      <a href="notities.html">Notities</a>
+    </nav>
+    <div class="agenda-container">
+      <div id="tijdswijzer"></div>
+      <!-- Hier kun je je agenda-items toevoegen -->
+      <ul>
+        <li>07:10 - 07:55: opstaan en ontbijten</li>
+        <li>07:55 - 08:10: naar school fietsen</li>
+        <li>08:25 - 15:35: school</li>
+        <li>15:35 - 15:50: naar huis fietsen</li>
+        <li>15:50 - 16:20: sporten</li>
+        <li>16:20 - 17:20: studeren</li>
+        <li>17:20 - 17:50: programmeren of iets anders</li>
+        <li>17:50 - 19:20: eten</li>
+        <li>19:20 - 20:20: vrije tijd</li>
+        <li>20:20 - 21:20: wassen</li>
+        <li>21:30 - 22:00: naar bed</li>
+      </ul>
+    </div>
+    <script src="index.js"></script>
+  </body>
+</html>

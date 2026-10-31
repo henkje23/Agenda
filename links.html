@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Bewaar en beheer je persoonlijke links bij je agenda."
+    />
+    <title>Links - Agenda</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        position: relative;
+        width: min(100% - 32px, 760px);
+        margin: 0 auto;
+        padding: 24px 0 48px;
+        color: #1f2937;
+        background: #eef2f7;
+        font-family: Arial, sans-serif;
+      }
+
+      h1 {
+        margin: 0 64px 8px 0;
+        color: #183153;
+        font-size: clamp(28px, 7vw, 36px);
+      }
+
+      .pagina-intro {
+        margin: 0 0 20px;
+        color: #526174;
+        line-height: 1.6;
+      }
+
+      .dagen-navigatie {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 20px;
+      }
+
+      .dagen-navigatie a,
+      .functies-menu summary {
+        display: block;
+        min-height: 42px;
+        padding: 11px 14px;
+        border: 1px solid #d6deea;
+        border-radius: 8px;
+        background: #fff;
+        color: #183153;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .dagen-navigatie a:hover,
+      .dagen-navigatie a:focus-visible,
+      .functies-menu[open] summary {
+        background: #183153;
+        color: #fff;
+      }
+
+      .functies-menu {
+        position: relative;
+      }
+
+      .functies-menu summary {
+        list-style: none;
+      }
+
+      .functies-menu summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .functies-menu summary::after {
+        content: " ▾";
+      }
+
+      .functies-menu-link {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        z-index: 10;
+        min-width: 150px;
+        box-shadow: 0 8px 24px rgb(24 49 83 / 14%);
+      }
+
+      .functies-menu-link[aria-current="page"] {
+        background: #e8f1ff;
+      }
+
+      .links-hoofd {
+        display: grid;
+        gap: 16px;
+      }
+
+      .links-login,
+      .links-formulier,
+      .links-kaart {
+        min-width: 0;
+        padding: 18px;
+        border: 1px solid #d6deea;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 6px 20px rgb(24 49 83 / 7%);
+      }
+
+      .links-login[hidden],
+      .links-formulier[hidden],
+      .links-status[hidden],
+      .links-leeg[hidden],
+      .links-lijst[hidden],
+      #link-nieuw[hidden],
+      #link-annuleren[hidden],
+      .links-profiel-link[hidden] {
+        display: none;
+      }
+
+      .links-login {
+        line-height: 1.6;
+      }
+
+      .links-login a {
+        color: #245da8;
+        font-weight: 600;
+      }
+
+      .links-balk {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .links-balk h2,
+      .links-formulier h2,
+      .links-kaart h2 {
+        margin: 0;
+        color: #183153;
+        font-size: 20px;
+      }
+
+      .links-knop {
+        display: inline-flex;
+        min-height: 42px;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 9px 14px;
+        border: 1px solid #183153;
+        border-radius: 8px;
+        background: #183153;
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 600;
+      }
+
+      .links-knop:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      .links-knop-secundair {
+        border-color: #cbd5e1;
+        background: #fff;
+        color: #183153;
+      }
+
+      .links-knop-verwijderen {
+        border-color: #f0c7ca;
+        background: #fff;
+        color: #a4262c;
+      }
+
+      .links-veld {
+        display: grid;
+        gap: 7px;
+        margin-bottom: 14px;
+        color: #334155;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .links-veld input {
+        width: 100%;
+        min-height: 44px;
+        padding: 11px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #fff;
+        color: #1f2937;
+        font: inherit;
+        font-size: 16px;
+      }
+
+      .links-veld input:focus {
+        border-color: #3978c5;
+        outline: 3px solid rgb(57 120 197 / 18%);
+      }
+
+      .links-formulier h2 {
+        margin-bottom: 14px;
+      }
+
+      .links-acties {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .links-status,
+      .links-leeg {
+        margin: 0;
+        color: #526174;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .links-status[data-state="error"] {
+        color: #a4262c;
+      }
+
+      .links-lijst {
+        display: grid;
+        gap: 12px;
+      }
+
+      .links-kaart {
+        overflow-wrap: anywhere;
+      }
+
+      .links-kaart h2 {
+        margin-bottom: 8px;
+      }
+
+      .links-adres {
+        display: inline-block;
+        margin-bottom: 14px;
+        color: #245da8;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+      }
+
+      .links-profiel-link {
+        position: fixed;
+        top: 18px;
+        right: max(16px, calc((100vw - 760px) / 2));
+        z-index: 20;
+        display: grid;
+        width: 48px;
+        height: 48px;
+        place-items: center;
+        overflow: hidden;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        background: #183153;
+        color: #fff;
+        box-shadow: 0 2px 8px rgb(24 49 83 / 20%);
+        font-size: 18px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .links-profiel-link img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      @media (max-width: 520px) {
+        body {
+          width: min(100% - 24px, 760px);
+          padding-top: 16px;
+        }
+
+        .dagen-navigatie {
+          gap: 6px;
+        }
+
+        .dagen-navigatie a,
+        .functies-menu summary {
+          min-height: 40px;
+          padding: 10px;
+          font-size: 13px;
+        }
+
+        .links-login,
+        .links-formulier,
+        .links-kaart {
+          padding: 15px;
+        }
+
+        .links-balk {
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Mijn links</h1>
+    <p class="pagina-intro">
+      Bewaar handige websites op één plek. Je links zijn alleen zichtbaar voor
+      jouw account.
+    </p>
+
+    <nav class="dagen-navigatie" aria-label="Navigatie">
+      <a href="index.html?dag=maandag">Terug naar agenda</a>
+      <details class="functies-menu">
+        <summary>Functies</summary>
+        <a class="functies-menu-link" href="notities.html">Notities</a>
+        <a
+          class="functies-menu-link"
+          href="links.html"
+          aria-current="page"
+          >Links</a
+        >
+      </details>
+    </nav>
+
+    <a
+      class="links-profiel-link"
+      href="profiel.html"
+      aria-label="Naar profiel"
+      title="Naar profiel"
+      hidden
+      >👤</a
+    >
+
+    <main class="links-hoofd">
+      <section id="links-aanmelden" class="links-login" hidden>
+        <strong>Log in om je links te bekijken.</strong>
+        <p>
+          Gebruik hetzelfde account als voor je agenda.
+          <a href="index.html?dag=maandag">Ga naar de agenda om in te loggen</a>.
+        </p>
+      </section>
+
+      <div class="links-balk">
+        <h2>Mijn links</h2>
+        <button id="link-nieuw" class="links-knop" type="button" hidden>
+          <span aria-hidden="true">+</span> Nieuwe link
+        </button>
+      </div>
+
+      <p
+        id="links-status"
+        class="links-status"
+        role="status"
+        aria-live="polite"
+      >
+        Links laden...
+      </p>
+
+      <form id="links-form" class="links-formulier" hidden>
+        <h2>Nieuwe link</h2>
+        <label class="links-veld" for="link-titel">
+          Naam
+          <input
+            id="link-titel"
+            name="title"
+            type="text"
+            maxlength="150"
+            autocomplete="off"
+            placeholder="Bijvoorbeeld: Schoolplatform"
+            required
+          />
+        </label>
+        <label class="links-veld" for="link-url">
+          Website
+          <input
+            id="link-url"
+            name="url"
+            type="url"
+            maxlength="2048"
+            inputmode="url"
+            autocomplete="url"
+            placeholder="https://voorbeeld.be"
+            required
+          />
+        </label>
+        <div class="links-acties">
+          <button class="links-knop" type="submit">Link opslaan</button>
+          <button
+            id="link-annuleren"
+            class="links-knop links-knop-secundair"
+            type="button"
+            hidden
+          >
+            Annuleren
+          </button>
+        </div>
+      </form>
+
+      <p id="links-leeg" class="links-leeg" hidden>
+        Je hebt nog geen links. Voeg je eerste link toe met de knop hierboven.
+      </p>
+      <section
+        id="links-lijst"
+        class="links-lijst"
+        aria-label="Opgeslagen links"
+        hidden
+      ></section>
+    </main>
+    <script src="index.js"></script>
+  </body>
+</html>
