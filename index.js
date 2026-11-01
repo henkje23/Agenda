@@ -531,16 +531,20 @@ function setupFunctionsNavigation() {
     darkModeStyle.id = darkModeStyleId;
     darkModeStyle.textContent = `
       body.dark-mode { color: #e5e7eb !important; background: #111827 !important; color-scheme: dark; }
-      body.dark-mode h1, body.dark-mode h2, body.dark-mode .agenda-day-heading, body.dark-mode .notities-balk h2, body.dark-mode .notitie-editor h2, body.dark-mode .notitie-kaart h2, body.dark-mode .links-header h2 { color: #e5e7eb !important; }
-      body.dark-mode p, body.dark-mode .pagina-intro, body.dark-mode .profiel-uitleg, body.dark-mode #profiel-status, body.dark-mode .notitie-tekst, body.dark-mode .notitie-datum, body.dark-mode .notities-status { color: #cbd5e1 !important; }
-      body.dark-mode .agenda-container, body.dark-mode .agenda-day-panel, body.dark-mode .agenda-account, body.dark-mode .agenda-item-form, body.dark-mode .profiel-container, body.dark-mode .notitie-editor, body.dark-mode .notitie-kaart, body.dark-mode .notities-aanmelden, body.dark-mode .links-kaart, body.dark-mode .links-formulier { border-color: #374151 !important; background: #1f2937 !important; color: #e5e7eb !important; }
+      body.dark-mode h1, body.dark-mode h2, body.dark-mode .agenda-day-heading, body.dark-mode .notities-balk h2, body.dark-mode .notitie-editor h2, body.dark-mode .notitie-kaart h2, body.dark-mode .links-header h2, body.dark-mode .todo-balk h2 { color: #e5e7eb !important; }
+      body.dark-mode p, body.dark-mode .pagina-intro, body.dark-mode .profiel-uitleg, body.dark-mode #profiel-status, body.dark-mode .notitie-tekst, body.dark-mode .notitie-datum, body.dark-mode .notities-status, body.dark-mode .todo-status, body.dark-mode .todo-teller { color: #cbd5e1 !important; }
+      body.dark-mode .agenda-container, body.dark-mode .agenda-day-panel, body.dark-mode .agenda-account, body.dark-mode .agenda-item-form, body.dark-mode .profiel-container, body.dark-mode .notitie-editor, body.dark-mode .notitie-kaart, body.dark-mode .notities-aanmelden, body.dark-mode .links-kaart, body.dark-mode .links-formulier, body.dark-mode .todo-paneel, body.dark-mode .todo-formulier, body.dark-mode .todo-aanmelden { border-color: #374151 !important; background: #1f2937 !important; color: #e5e7eb !important; }
       body.dark-mode .agenda-day-panel li, body.dark-mode .agenda-item { border-color: #475569; background: #273449 !important; color: #f3f4f6; }
-      body.dark-mode input, body.dark-mode select, body.dark-mode textarea, body.dark-mode .agenda-item-actions button, body.dark-mode #profiel-foto-knop, body.dark-mode #profiel-exporteren, body.dark-mode .notitie-knop-secundair, body.dark-mode .notitie-knop-verwijderen, body.dark-mode .links-knop-secundair, body.dark-mode .links-knop-verwijderen { border-color: #4b5563 !important; background: #111827 !important; color: #f3f4f6 !important; }
+      body.dark-mode input, body.dark-mode select, body.dark-mode textarea, body.dark-mode .agenda-item-actions button, body.dark-mode #profiel-foto-knop, body.dark-mode #profiel-exporteren, body.dark-mode .notitie-knop-secundair, body.dark-mode .notitie-knop-verwijderen, body.dark-mode .links-knop-secundair, body.dark-mode .links-knop-verwijderen, body.dark-mode .todo-invoer input, body.dark-mode .todo-knop-secundair, body.dark-mode .todo-knop-verwijderen, body.dark-mode .todo-filter { border-color: #4b5563 !important; background: #111827 !important; color: #f3f4f6 !important; }
       body.dark-mode .dagen-navigatie a, body.dark-mode .functies-menu summary, body.dark-mode .functies-menu-link, body.dark-mode .agenda-week-navigation button { border-color: #4b5563 !important; background: #1f2937 !important; color: #e5e7eb !important; }
       body.dark-mode .dagen-navigatie a:hover, body.dark-mode .dagen-navigatie a:focus-visible, body.dark-mode .functies-menu[open] summary, body.dark-mode .functies-menu-link:hover, body.dark-mode .functies-menu-link:focus-visible, body.dark-mode .agenda-week-navigation button:hover, body.dark-mode .agenda-week-navigation button:focus-visible { background: #374151 !important; }
       body.dark-mode .functies-menu-link[aria-current="page"] { background: #374151 !important; }
       body.dark-mode .agenda-week-label, body.dark-mode .agenda-account-message, body.dark-mode .notitie-veld, body.dark-mode .links-status, body.dark-mode .links-login { color: #d1d5db !important; }
       body.dark-mode .agenda-item-actions button { color: #e5e7eb !important; }
+      body.dark-mode .todo-item { border-color: #475569; background: #273449; color: #f3f4f6; }
+      body.dark-mode .todo-item.is-voltooid .todo-tekst { color: #94a3b8 !important; }
+      body.dark-mode .todo-leeg { border-color: #475569; color: #cbd5e1 !important; }
+      body.dark-mode .todo-filter[aria-pressed="true"] { border-color: #64748b !important; background: #374151 !important; }
     `;
     document.head.append(darkModeStyle);
   }
@@ -611,6 +615,18 @@ function setupFunctionsNavigation() {
     linksLink.textContent = "Links";
     menu.append(linksLink);
   }
+  if (!menu.querySelector('a[href="todo.html"]')) {
+    const todoLink = document.createElement("a");
+    todoLink.className = "functies-menu-link";
+    todoLink.href = "todo.html";
+    todoLink.textContent = "Todo";
+    menu.append(todoLink);
+  }
+  menu.querySelectorAll(".functies-menu-link").forEach((link) => {
+    if (link.getAttribute("href") === currentPage.toLowerCase()) {
+      link.setAttribute("aria-current", "page");
+    }
+  });
   if (!menu.querySelector(".functies-thema-knop")) {
     const themeButton = document.createElement("button");
     themeButton.type = "button";
@@ -637,11 +653,318 @@ function setupFunctionsNavigation() {
       .functies-menu summary::after { content: " ▾"; }
       .functies-menu[open] summary { background: #183153; color: #fff; }
       .functies-menu-link { position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; display: block; min-width: 150px; padding: 10px 14px; border: 1px solid #d6deea; border-radius: 8px; background: #fff; color: #183153; box-shadow: 0 8px 24px rgb(24 49 83 / 14%); font-size: 14px; font-weight: 600; text-decoration: none; }
-      .functies-menu-link + .functies-menu-link { top: calc(100% + 46px); }
-      .functies-thema-knop { top: calc(100% + 88px) !important; width: 100%; text-align: left; cursor: pointer; font-family: inherit; }
+      .functies-menu-link:nth-child(2) { top: calc(100% + 4px); }
+      .functies-menu-link:nth-child(3) { top: calc(100% + 46px); }
+      .functies-menu-link:nth-child(4) { top: calc(100% + 88px); }
+      .functies-thema-knop { top: calc(100% + 130px) !important; width: 100%; text-align: left; cursor: pointer; font-family: inherit; }
       .functies-menu-link:hover, .functies-menu-link:focus-visible, .functies-menu-link[aria-current="page"] { background: #e8f1ff; }
     `;
     document.head.append(style);
+  }
+}
+
+async function initializeTodoPage() {
+  const form = document.querySelector("#todo-formulier");
+  const input = document.querySelector("#todo-invoer");
+  const saveButton = document.querySelector("#todo-bewaren");
+  const cancelButton = document.querySelector("#todo-annuleren");
+  const list = document.querySelector("#todo-lijst");
+  const emptyMessage = document.querySelector("#todo-leeg");
+  const count = document.querySelector("#todo-teller");
+  const status = document.querySelector("#todo-status");
+  const loginPrompt = document.querySelector("#todo-aanmelden");
+  const todoPanel = document.querySelector("#todo-paneel");
+  const filterButtons = [...document.querySelectorAll(".todo-filter")];
+  let tasks = [];
+  let user = null;
+  let editingId = null;
+  let activeFilter = "alle";
+  let requestNumber = 0;
+
+  function showStatus(message, isError = false) {
+    status.textContent = message;
+    status.dataset.state = isError ? "error" : "info";
+  }
+
+  try {
+    if (!window.supabase?.createClient) {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+        script.onload = resolve;
+        script.onerror = () =>
+          reject(new Error("De Supabase-bibliotheek kon niet worden geladen."));
+        document.head.append(script);
+      });
+    }
+    if (!window.supabase?.createClient) {
+      throw new Error("De Supabase-bibliotheek kon niet worden gestart.");
+    }
+
+    const client = window.supabase.createClient(
+      supabaseConfig.url,
+      supabaseConfig.publishableKey,
+    );
+
+    function renderTasks() {
+      const visibleTasks = tasks.filter((task) => {
+        if (activeFilter === "open") {
+          return !task.completed;
+        }
+        if (activeFilter === "voltooid") {
+          return task.completed;
+        }
+        return true;
+      });
+
+      list.replaceChildren();
+      visibleTasks.forEach((task) => {
+        const item = document.createElement("li");
+        item.className = "todo-item";
+        item.classList.toggle("is-voltooid", task.completed);
+
+        const checkbox = document.createElement("input");
+        checkbox.className = "todo-checkbox";
+        checkbox.type = "checkbox";
+        checkbox.checked = task.completed;
+        checkbox.setAttribute(
+          "aria-label",
+          `Markeer "${task.task}" als voltooid`,
+        );
+        checkbox.addEventListener("change", async () => {
+          checkbox.disabled = true;
+          try {
+            await updateTask(task.id, { completed: checkbox.checked });
+          } catch (error) {
+            console.error("Taakstatus opslaan is mislukt.", error);
+            showStatus(`Taakstatus opslaan is mislukt: ${error.message}`, true);
+            checkbox.checked = task.completed;
+          } finally {
+            checkbox.disabled = false;
+          }
+        });
+
+        const text = document.createElement("span");
+        text.className = "todo-tekst";
+        text.textContent = task.task;
+
+        const actions = document.createElement("div");
+        actions.className = "todo-acties";
+        const editButton = document.createElement("button");
+        editButton.className = "todo-knop todo-knop-secundair";
+        editButton.type = "button";
+        editButton.textContent = "Bewerken";
+        editButton.setAttribute("aria-label", `Bewerk taak: ${task.task}`);
+        editButton.addEventListener("click", () => startEditing(task));
+
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "todo-knop todo-knop-verwijderen";
+        deleteButton.type = "button";
+        deleteButton.textContent = "Verwijderen";
+        deleteButton.setAttribute("aria-label", `Verwijder taak: ${task.task}`);
+        deleteButton.addEventListener("click", async () => {
+          deleteButton.disabled = true;
+          try {
+            const { data, error } = await client
+              .from("todo_tasks")
+              .delete()
+              .eq("id", task.id)
+              .eq("user_id", user.id)
+              .select("id")
+              .maybeSingle();
+            if (error) {
+              throw error;
+            }
+            if (!data) {
+              throw new Error(
+                "De taak is niet verwijderd. Controleer je account en de RLS-beveiligingsregels.",
+              );
+            }
+            if (editingId === task.id) {
+              stopEditing();
+            }
+            showStatus("Taak verwijderd.");
+            await loadTasks();
+          } catch (error) {
+            deleteButton.disabled = false;
+            console.error("Taak verwijderen is mislukt.", error);
+            showStatus(`Taak verwijderen is mislukt: ${error.message}`, true);
+          }
+        });
+
+        actions.append(editButton, deleteButton);
+        item.append(checkbox, text, actions);
+        list.append(item);
+      });
+
+      const completedCount = tasks.filter((task) => task.completed).length;
+      count.textContent = `${completedCount} van ${tasks.length} voltooid`;
+      emptyMessage.hidden = visibleTasks.length > 0;
+      emptyMessage.textContent =
+        tasks.length === 0
+          ? "Nog geen taken. Voeg hierboven je eerste taak toe."
+          : "Geen taken in deze selectie.";
+    }
+
+    async function loadTasks() {
+      if (!user) {
+        return;
+      }
+
+      const currentRequest = ++requestNumber;
+      showStatus("Je taken laden...");
+      const { data, error } = await client
+        .from("todo_tasks")
+        .select("id, user_id, task, completed, created_at, updated_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true });
+      if (error) {
+        throw error;
+      }
+      if (currentRequest !== requestNumber) {
+        return;
+      }
+
+      tasks = data || [];
+      renderTasks();
+      showStatus(
+        tasks.length
+          ? `${tasks.length} ${tasks.length === 1 ? "taak" : "taken"} geladen.`
+          : "Je taken zijn geladen.",
+      );
+    }
+
+    async function updateTask(id, changes) {
+      const { data, error } = await client
+        .from("todo_tasks")
+        .update({ ...changes, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .select("id")
+        .maybeSingle();
+      if (error) {
+        throw error;
+      }
+      if (!data) {
+        throw new Error(
+          "De taak is niet bijgewerkt. Controleer je account en de RLS-beveiligingsregels.",
+        );
+      }
+      await loadTasks();
+    }
+
+    function startEditing(task) {
+      editingId = task.id;
+      input.value = task.task;
+      saveButton.textContent = "Wijziging opslaan";
+      cancelButton.hidden = false;
+      input.focus();
+    }
+
+    function stopEditing() {
+      editingId = null;
+      form.reset();
+      saveButton.textContent = "Taak toevoegen";
+      cancelButton.hidden = true;
+    }
+
+    function updateSignedInState(signedInUser) {
+      user = signedInUser;
+      loginPrompt.hidden = Boolean(user);
+      form.hidden = !user;
+      todoPanel.hidden = !user;
+
+      if (user) {
+        loadTasks().catch((error) => {
+          console.error("Taken konden niet worden geladen.", error);
+          showStatus(
+            `Taken konden niet worden geladen: ${error.message}. Controleer of de tabel todo_tasks en de beveiligingsregels in Supabase zijn aangemaakt.`,
+            true,
+          );
+        });
+      } else {
+        requestNumber += 1;
+        tasks = [];
+        list.replaceChildren();
+        count.textContent = "";
+        emptyMessage.hidden = true;
+        stopEditing();
+        showStatus("Log in via je agenda-account om je taken te bekijken.");
+      }
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!user) {
+        showStatus("Log eerst in om een taak op te slaan.", true);
+        return;
+      }
+
+      const taskText = input.value.trim();
+      if (!taskText) {
+        input.focus();
+        return;
+      }
+
+      saveButton.disabled = true;
+      try {
+        if (editingId) {
+          const taskId = editingId;
+          await updateTask(taskId, { task: taskText });
+          stopEditing();
+          showStatus("Taak bijgewerkt.");
+        } else {
+          const { error } = await client.from("todo_tasks").insert({
+            user_id: user.id,
+            task: taskText,
+          });
+          if (error) {
+            throw error;
+          }
+          form.reset();
+          showStatus("Taak opgeslagen.");
+          await loadTasks();
+          input.focus();
+        }
+      } catch (error) {
+        console.error("Taak opslaan is mislukt.", error);
+        showStatus(
+          `Taak opslaan is mislukt: ${error.message}. Controleer of de tabel todo_tasks en de beveiligingsregels in Supabase zijn aangemaakt.`,
+          true,
+        );
+      } finally {
+        saveButton.disabled = false;
+      }
+    });
+
+    cancelButton.addEventListener("click", stopEditing);
+    filterButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        activeFilter = button.dataset.filter;
+        filterButtons.forEach((filterButton) => {
+          filterButton.setAttribute(
+            "aria-pressed",
+            String(filterButton === button),
+          );
+        });
+        renderTasks();
+      });
+    });
+
+    client.auth.onAuthStateChange((_event, session) => {
+      window.setTimeout(
+        () => updateSignedInState(session?.user || null),
+        0,
+      );
+    });
+    const { data, error } = await client.auth.getSession();
+    if (error) {
+      throw error;
+    }
+    updateSignedInState(data.session?.user || null);
+  } catch (error) {
+    console.error("De todo-pagina kon niet worden gestart.", error);
+    showStatus(`De todo-pagina kon niet worden gestart: ${error.message}`, true);
   }
 }
 
@@ -1267,6 +1590,8 @@ if (
   initializeNotesPage();
 } else if (currentPage.toLowerCase() === "links.html") {
   initializeLinksPage();
+} else if (currentPage.toLowerCase() === "todo.html") {
+  initializeTodoPage();
 } else {
   const agenda = document.querySelector(".agenda-container");
   const timeIndicator = document.querySelector("#tijdswijzer");

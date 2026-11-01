@@ -1,5 +1,6 @@
--- Run this in Supabase SQL Editor to enable private notes, links, repeating
--- agenda items, and the private storage used by password recovery codes.
+-- Run this in Supabase SQL Editor to enable private notes, links, todo tasks,
+-- repeating agenda items, and the private storage used by password recovery
+-- codes.
 -- Password recovery also requires deploying the password-recovery Edge Function.
 begin;
 
@@ -26,6 +27,15 @@ create table if not exists public.user_links (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.todo_tasks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  task varchar(200) not null check (length(btrim(task)) > 0),
+  completed boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.password_recovery_codes (
   user_id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
@@ -44,12 +54,16 @@ create index if not exists agenda_items_user_start_idx
 create index if not exists user_links_user_created_idx
   on public.user_links (user_id, created_at desc);
 
+create index if not exists todo_tasks_user_created_idx
+  on public.todo_tasks (user_id, created_at);
+
 create index if not exists password_recovery_email_idx
   on public.password_recovery_codes (lower(email));
 
 alter table public.agenda_items enable row level security;
 alter table public.notes enable row level security;
 alter table public.user_links enable row level security;
+alter table public.todo_tasks enable row level security;
 alter table public.password_recovery_codes enable row level security;
 
 revoke all on public.password_recovery_codes from anon, authenticated, public;
@@ -126,7 +140,7 @@ begin
     select schemaname, tablename, policyname
     from pg_policies
     where schemaname = 'public'
-      and tablename in ('agenda_items', 'notes', 'user_links')
+      and tablename in ('agenda_items', 'notes', 'user_links', 'todo_tasks')
   loop
     execute format(
       'drop policy %I on %I.%I',
@@ -168,8 +182,18 @@ create policy user_links_update_own on public.user_links
 create policy user_links_delete_own on public.user_links
   for delete to authenticated using (auth.uid() = user_id);
 
+create policy todo_tasks_select_own on public.todo_tasks
+  for select to authenticated using (auth.uid() = user_id);
+create policy todo_tasks_insert_own on public.todo_tasks
+  for insert to authenticated with check (auth.uid() = user_id);
+create policy todo_tasks_update_own on public.todo_tasks
+  for update to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy todo_tasks_delete_own on public.todo_tasks
+  for delete to authenticated using (auth.uid() = user_id);
+
 grant select, insert, update, delete
-  on public.agenda_items, public.notes, public.user_links
+  on public.agenda_items, public.notes, public.user_links, public.todo_tasks
   to authenticated;
 
 notify pgrst, 'reload schema';
