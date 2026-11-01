@@ -147,6 +147,48 @@
         font-size: 14px;
       }
 
+      .profiel-herstel {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid #d6deea;
+      }
+
+      .profiel-herstel form {
+        display: grid;
+        gap: 10px;
+      }
+
+      .profiel-herstel input,
+      .profiel-herstel button {
+        min-height: 40px;
+        padding: 8px 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font: inherit;
+      }
+
+      .profiel-herstel button {
+        border-color: #183153;
+        background: #183153;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      .profiel-herstel button:disabled {
+        cursor: wait;
+        opacity: 0.7;
+      }
+
+      .profiel-herstel p {
+        color: #526174;
+        font-size: 14px;
+        overflow-wrap: anywhere;
+      }
+
+      .profiel-herstel [hidden] {
+        display: none;
+      }
+
       #profiel-uitloggen:disabled {
         cursor: wait;
         opacity: 0.7;
@@ -207,6 +249,17 @@
         </p>
         <h2>Account</h2>
         <p>Ingelogd als <strong id="profiel-email"></strong></p>
+        <section class="profiel-herstel">
+          <h2>Wachtwoord herstellen</h2>
+          <p>
+            Maak een herstelcode en bewaar die veilig. Zonder e-mail kun je
+            alleen met die code een nieuw wachtwoord instellen.
+          </p>
+          <button id="profiel-herstelcode-maken" type="button">
+            Herstelcode maken/vervangen
+          </button>
+          <p id="profiel-herstelcode-uitvoer" role="status" aria-live="polite" hidden></p>
+        </section>
           <h2>Agenda exporteren</h2>
           <p class="profiel-uitleg">
             Download je volledige agenda als .ics-bestand om die bijvoorbeeld in
@@ -219,6 +272,26 @@
             Agenda laden...
           </p>
           <button id="profiel-uitloggen" type="button">Uitloggen</button>
+      </section>
+      <section id="profiel-wachtwoord-herstellen" class="profiel-herstel" hidden>
+        <h2>Wachtwoord herstellen met herstelcode</h2>
+        <p>Vul het e-mailadres van je account, je bewaarde herstelcode en een nieuw wachtwoord in.</p>
+        <form id="profiel-herstel-form">
+          <label>E-mailadres
+            <input name="email" type="email" autocomplete="email" required />
+          </label>
+          <label>Herstelcode
+            <input name="recovery_code" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="32" pattern="[0-9a-fA-F]{32}" required />
+          </label>
+          <label>Nieuw wachtwoord
+            <input name="password" type="password" autocomplete="new-password" minlength="6" required />
+          </label>
+          <label>Herhaal nieuw wachtwoord
+            <input name="password_confirmation" type="password" autocomplete="new-password" minlength="6" required />
+          </label>
+          <button type="submit">Wachtwoord herstellen</button>
+        </form>
+        <p id="profiel-herstel-status" role="status" aria-live="polite"></p>
       </section>
     </main>
     <script src="index.js"></script>
