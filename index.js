@@ -745,6 +745,7 @@ async function initializeNotesPage() {
           editor.querySelector('button[type="submit"]').textContent =
             "Wijzigingen opslaan";
           cancelButton.hidden = false;
+          editor.hidden = false;
           editor.scrollIntoView({ behavior: "smooth", block: "start" });
           titleInput.focus();
         });
