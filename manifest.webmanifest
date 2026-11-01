@@ -1,0 +1,20 @@
+{
+  "id": "./",
+  "name": "Agenda",
+  "short_name": "Agenda",
+  "description": "Je persoonlijke weekagenda, notities en taken.",
+  "lang": "nl",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef2f7",
+  "theme_color": "#183153",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

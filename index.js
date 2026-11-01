@@ -1735,6 +1735,10 @@ if (
       heading.className = "agenda-day-heading";
       heading.textContent = day.charAt(0).toLocaleUpperCase("nl") + day.slice(1);
 
+      const dayHeader = document.createElement("div");
+      dayHeader.className = "agenda-day-header";
+      dayHeader.append(heading);
+
       const indicator = document.createElement("div");
       indicator.className = "agenda-time-indicator";
       indicator.setAttribute("aria-hidden", "true");
@@ -1743,7 +1747,7 @@ if (
         day === weekdayNames[currentPageWeekday]
           ? list
           : document.createElement("ul");
-      panel.append(heading, indicator, dayList);
+      panel.append(dayHeader, indicator, dayList);
       weekOverview.append(panel);
       dayLists.set(day, dayList);
       dayPanels.set(day, panel);
@@ -1761,15 +1765,33 @@ if (
       .agenda-week-label { min-width: 190px; color: #183153; text-align: center; }
       .agenda-week-overview { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
       .agenda-day-panel { position: relative; min-width: 0; padding: 12px; border: 1px solid #d6deea; border-radius: 10px; background: #fff; }
-      .agenda-day-heading { margin: 0 0 12px; color: #183153; font-size: 16px; }
+      .agenda-day-header { display: flex; min-width: 0; flex-direction: column; align-items: stretch; gap: 5px; margin-bottom: 12px; }
+      .agenda-day-heading { order: 1; min-width: 0; margin: 0; color: #183153; font-size: 16px; }
+      .agenda-day-panel ul.agenda-all-day-list { order: 0; display: flex; min-width: 0; margin: 0; padding: 0; }
+      .agenda-day-panel li.agenda-all-day-item { min-width: 0; padding: 5px 7px; font-size: 11px; }
+      .agenda-all-day-item .agenda-item-time { display: none; }
+      .agenda-all-day-item .agenda-item-title { display: block; overflow: hidden; font-size: 11px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+      .agenda-all-day-item .agenda-category-badge { display: none; }
       .agenda-day-panel ul { min-width: 0; }
       .agenda-day-panel li { overflow-wrap: anywhere; padding: 10px; font-size: 13px; }
+      .agenda-day-panel li.agenda-overlap-group { position: static; min-width: 0; padding: 0; border: 0; border-left: 0; border-radius: 0; background: transparent; box-shadow: none; }
+      .agenda-day-panel ul.agenda-overlap-items { display: grid; grid-template-columns: repeat(var(--agenda-overlap-columns), minmax(0, 1fr)); gap: 10px; }
+      .agenda-day-panel ul.agenda-overlap-items > li { min-width: 0; padding: 6px 4px; font-size: 10px; }
+      .agenda-overlap-items .agenda-item-time { display: block; margin-bottom: 3px; color: #183153; font-size: 10px; font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; }
+      .agenda-overlap-items .agenda-item-title { display: -webkit-box; overflow: hidden; font-size: 10px; line-height: 1.25; text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+      .agenda-overlap-items .agenda-category-badge { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .agenda-day-panel li.agenda-item.planning-actief { position: relative; z-index: 12; order: -1; }
+      .agenda-day-panel li.agenda-item.is-overlap-expanded { position: absolute; z-index: 20; right: 0; left: 0; width: auto; padding: 10px; font-size: 13px; box-shadow: 0 6px 18px rgb(24 49 83 / 28%); }
+      .agenda-overlap-items .agenda-item.is-overlap-expanded .agenda-item-time { display: inline; margin: 0; font-size: inherit; }
+      .agenda-overlap-items .agenda-item.is-overlap-expanded .agenda-item-title { display: inline; overflow: visible; font-size: inherit; line-height: inherit; text-overflow: clip; -webkit-line-clamp: unset; }
+      body.dark-mode .agenda-day-panel li.agenda-overlap-group { border-color: transparent !important; border-left-color: transparent !important; background: transparent !important; box-shadow: none !important; }
+      body.dark-mode .agenda-overlap-items .agenda-item-time { color: #e5e7eb; }
       .agenda-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
       .agenda-filter-field { display: grid; min-width: 160px; flex: 1; gap: 5px; color: #334155; font-size: 13px; font-weight: 600; }
       .agenda-filter-field input, .agenda-filter-field select { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #1f2937; font: inherit; font-size: 16px; }
       .agenda-search-field { flex-basis: 240px; }
       .agenda-category-badge { display: inline-block; margin: 5px 5px 0 0; padding: 2px 6px; border-radius: 999px; background: #e8f1ff; color: #183153; font-size: 11px; }
-      .agenda-time-indicator { position: absolute; z-index: 10; top: 0; right: 8px; left: 8px; height: 2px; background: #e5484d; visibility: hidden; pointer-events: none; }
+      .agenda-time-indicator { position: absolute; z-index: 30; top: 0; right: 8px; left: 8px; height: 2px; background: #e5484d; visibility: hidden; pointer-events: none; }
       .agenda-time-indicator.is-visible { visibility: visible; }
       .agenda-month-navigation { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
       .agenda-month-navigation button { min-height: 40px; padding: 8px 12px; border: 1px solid #d6deea; border-radius: 8px; background: #fff; color: #183153; cursor: pointer; font: inherit; font-weight: 600; }
@@ -2369,6 +2391,71 @@ if (
       return `${String(hours).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
     }
 
+    function groupOverlappingItems(dayList) {
+      const dayPanel = dayList.closest(".agenda-day-panel");
+      dayPanel.querySelector(".agenda-all-day-list")?.remove();
+
+      const allDayItems = [];
+      const groups = [];
+      let currentGroup = [];
+      let currentGroupEnd = -Infinity;
+
+      Array.from(dayList.children).forEach((item) => {
+        const start = Number(item.dataset.start);
+        const end = Number(item.dataset.end);
+        if (start === 0 && end >= 23 * 60) {
+          allDayItems.push(item);
+          return;
+        }
+        if (!Number.isFinite(start) || !Number.isFinite(end)) {
+          groups.push([item]);
+          currentGroup = [];
+          currentGroupEnd = -Infinity;
+          return;
+        }
+
+        if (start >= currentGroupEnd) {
+          currentGroup = [item];
+          groups.push(currentGroup);
+          currentGroupEnd = end;
+          return;
+        }
+
+        currentGroup.push(item);
+        currentGroupEnd = Math.max(currentGroupEnd, end);
+      });
+
+      if (allDayItems.length) {
+        const allDayList = document.createElement("ul");
+        allDayList.className = "agenda-all-day-list";
+        allDayItems.forEach((item) => {
+          item.classList.add("agenda-all-day-item");
+          allDayList.append(item);
+        });
+        dayPanel.querySelector(".agenda-day-header").prepend(allDayList);
+      }
+
+      dayList.replaceChildren();
+      groups.forEach((group) => {
+        if (group.length === 1) {
+          dayList.append(group[0]);
+          return;
+        }
+
+        const wrapper = document.createElement("li");
+        wrapper.className = "agenda-overlap-group";
+        const overlapList = document.createElement("ul");
+        overlapList.className = "agenda-overlap-items";
+        overlapList.style.setProperty(
+          "--agenda-overlap-columns",
+          String(group.length),
+        );
+        overlapList.append(...group);
+        wrapper.append(overlapList);
+        dayList.append(wrapper);
+      });
+    }
+
     function applyColor(item, value) {
       const normalized = value.toLocaleLowerCase("nl");
       const color = dutchColors[normalized] || value;
@@ -2422,8 +2509,13 @@ if (
           const nextEntry = dayEntries[index + 1];
           const end = getEndTime(entry, nextEntry);
           const item = document.createElement("li");
-
-          item.textContent = `${formatTime(entry.time.start)} - ${formatTime(end)}: ${entry.category ? `[${entry.category}] ` : ""}${entry.title}`;
+          const timeText = document.createElement("span");
+          timeText.className = "agenda-item-time";
+          timeText.textContent = `${formatTime(entry.time.start)} - ${formatTime(end)}: `;
+          const titleText = document.createElement("span");
+          titleText.className = "agenda-item-title";
+          titleText.textContent = `${entry.category ? `[${entry.category}] ` : ""}${entry.title}`;
+          item.append(timeText, titleText);
           item.dataset.start = String(entry.time.start);
           item.dataset.end = String(end);
           if (entry.color && !applyColor(item, entry.color)) {
@@ -2431,6 +2523,7 @@ if (
           }
           dayList.append(item);
         });
+        groupOverlappingItems(dayList);
       });
 
       const skippedMessage = skippedRows.length
@@ -2886,9 +2979,12 @@ if (
             item.dataset.start = String(entry.time.start);
             item.dataset.end = String(end);
             const text = document.createElement("span");
-            text.className = "agenda-item-text";
-            text.textContent = `${entry.startText} - ${formatTime(end)}: ${entry.title}`;
-            item.append(text);
+            text.className = "agenda-item-time";
+            text.textContent = `${entry.startText} - ${formatTime(end)}: `;
+            const title = document.createElement("span");
+            title.className = "agenda-item-title";
+            title.textContent = entry.title;
+            item.append(text, title);
             if (entry.category) {
               const badge = document.createElement("span");
               badge.className = "agenda-category-badge";
@@ -2978,8 +3074,27 @@ if (
             });
 
             function toggleActions() {
-              actions.hidden = !actions.hidden;
-              item.setAttribute("aria-expanded", String(!actions.hidden));
+              const isExpanded = actions.hidden;
+              const overlapGroup = item.closest(".agenda-overlap-group");
+              const isGroupedEvent =
+                overlapGroup || item.closest(".agenda-all-day-list");
+              if (isGroupedEvent && isExpanded) {
+                const panel = item.closest(".agenda-day-panel");
+                const top =
+                  item.getBoundingClientRect().top -
+                  panel.getBoundingClientRect().top +
+                  panel.scrollTop;
+                item.style.top = `${top}px`;
+                item.classList.add("is-overlap-expanded");
+              } else if (isGroupedEvent) {
+                item.classList.remove("is-overlap-expanded");
+                item.style.removeProperty("top");
+              }
+              actions.hidden = !isExpanded;
+              item.setAttribute("aria-expanded", String(isExpanded));
+              if (isGroupedEvent) {
+                updateTimeIndicator();
+              }
             }
 
             item.addEventListener("click", (event) => {
@@ -3000,6 +3115,7 @@ if (
             item.append(actions);
             dayList.append(item);
           });
+          groupOverlappingItems(dayList);
         });
 
         const repeatDaysNotice = supportsRepeatDays
@@ -3360,46 +3476,77 @@ if (
         const dayList = dayLists.get(day);
         const panel = dayPanels.get(day);
         const indicator = dayIndicators.get(day);
-        const items = Array.from(dayList.querySelectorAll("li"));
+        const items = Array.from(
+          panel.querySelectorAll("li[data-start][data-end]"),
+        );
+        const activeItems = [];
         let currentStart;
         let currentEnd;
-        const currentItem =
-          isCurrentWeek && day === currentDay
-            ? items.find((item) => {
-                const start = Number(item.dataset.start);
-                let end = Number(item.dataset.end);
-                if (!Number.isFinite(start) || !Number.isFinite(end)) {
-                  return false;
-                }
-                if (end <= start) {
-                  end += 24 * 60;
-                }
-                if (currentMinutes >= start && currentMinutes < end) {
-                  currentStart = start;
-                  currentEnd = end;
-                  return true;
-                }
-                return false;
-              })
-            : null;
+        let currentItem = null;
+        if (isCurrentWeek && day === currentDay) {
+          items.forEach((item) => {
+            const start = Number(item.dataset.start);
+            let end = Number(item.dataset.end);
+            if (!Number.isFinite(start) || !Number.isFinite(end)) {
+              return;
+            }
+            if (end <= start) {
+              end += 24 * 60;
+            }
+            if (currentMinutes >= start && currentMinutes < end) {
+              activeItems.push({ item, start, end });
+            }
+          });
+        }
 
         items.forEach((item) => {
-          item.classList.toggle("planning-actief", item === currentItem);
+          item.classList.remove("planning-actief");
         });
+        const timedItems = activeItems.filter(
+          ({ item }) => !item.classList.contains("agenda-all-day-item"),
+        );
+        const indicatorItems = timedItems.length ? timedItems : activeItems;
+        indicatorItems.forEach(({ item }) =>
+          item.classList.add("planning-actief"),
+        );
+        const currentEvent = indicatorItems.reduce((current, candidate) =>
+          !current ||
+          candidate.start > current.start ||
+          (candidate.start === current.start && candidate.end < current.end)
+            ? candidate
+            : current,
+        null);
+        currentItem = currentEvent?.item || null;
+        currentStart = currentEvent?.start;
+        currentEnd = currentEvent?.end;
+
         indicator.classList.remove("is-visible");
 
         if (!currentItem) {
+          indicator.style.removeProperty("left");
+          indicator.style.removeProperty("right");
+          indicator.style.removeProperty("width");
           return;
         }
 
         const elapsedFraction =
           (currentMinutes - currentStart) / (currentEnd - currentStart);
+        const itemRect = currentItem.getBoundingClientRect();
+        const panelRect = panel.getBoundingClientRect();
+        const activeRects = indicatorItems.map(({ item }) =>
+          item.getBoundingClientRect(),
+        );
+        const left = Math.min(...activeRects.map((rect) => rect.left));
+        const right = Math.max(...activeRects.map((rect) => rect.right));
         const top =
-          currentItem.getBoundingClientRect().top -
-          panel.getBoundingClientRect().top +
+          itemRect.top -
+          panelRect.top +
           panel.scrollTop +
-          currentItem.getBoundingClientRect().height * elapsedFraction;
+          itemRect.height * elapsedFraction;
 
+        indicator.style.left = `${left - panelRect.left - panel.clientLeft + panel.scrollLeft}px`;
+        indicator.style.right = "auto";
+        indicator.style.width = `${right - left}px`;
         indicator.style.top = `${top}px`;
         indicator.classList.add("is-visible");
       });
