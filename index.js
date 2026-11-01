@@ -119,6 +119,17 @@ async function initializeProfilePage() {
   const avatarButton = document.querySelector("#profiel-foto-knop");
   const exportButton = document.querySelector("#profiel-exporteren");
   const exportStatus = document.querySelector("#profiel-export-status");
+  const recoveryCodeButton = document.querySelector(
+    "#profiel-herstelcode-maken",
+  );
+  const recoveryCodeOutput = document.querySelector(
+    "#profiel-herstelcode-uitvoer",
+  );
+  const recoverySection = document.querySelector(
+    "#profiel-wachtwoord-herstellen",
+  );
+  const recoveryForm = document.querySelector("#profiel-herstel-form");
+  const recoveryStatus = document.querySelector("#profiel-herstel-status");
 
   if (!accountDetails || !status || !logoutButton) {
     return;
@@ -144,6 +155,80 @@ async function initializeProfilePage() {
       supabaseConfig.url,
       supabaseConfig.publishableKey,
     );
+    recoveryForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const formData = new FormData(recoveryForm);
+      const password = String(formData.get("password"));
+      if (password !== String(formData.get("password_confirmation"))) {
+        recoveryStatus.textContent = "De nieuwe wachtwoorden zijn niet hetzelfde.";
+        return;
+      }
+
+      const submitButton = recoveryForm.querySelector('button[type="submit"]');
+      submitButton.disabled = true;
+      recoveryStatus.textContent = "Wachtwoord herstellen...";
+      try {
+        const { data: recoveryData, error: recoveryError } =
+          await client.functions.invoke("password-recovery", {
+            body: {
+              action: "reset",
+              email: String(formData.get("email")).trim(),
+              recoveryCode: String(formData.get("recovery_code")),
+              password,
+            },
+          });
+        if (recoveryError) {
+          throw recoveryError;
+        }
+
+        recoveryForm.reset();
+        recoveryStatus.textContent =
+          recoveryData?.message ||
+          "Je wachtwoord is hersteld. Je kunt nu inloggen.";
+      } catch (recoveryError) {
+        recoveryStatus.textContent =
+          `Wachtwoord herstellen is niet gelukt: ${recoveryError.message}`;
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+
+    recoveryCodeButton?.addEventListener("click", async () => {
+      if (
+        !window.confirm(
+          "De nieuwe herstelcode vervangt een eventuele vorige code. Bewaar hem veilig; zonder code kun je je wachtwoord niet herstellen. Doorgaan?",
+        )
+      ) {
+        return;
+      }
+
+      recoveryCodeButton.disabled = true;
+      recoveryCodeOutput.hidden = true;
+      try {
+        const { data: recoveryData, error: recoveryError } =
+          await client.functions.invoke("password-recovery", {
+            body: { action: "create" },
+          });
+        if (recoveryError) {
+          throw recoveryError;
+        }
+        if (typeof recoveryData?.recoveryCode !== "string") {
+          throw new Error("De server heeft geen herstelcode teruggestuurd.");
+        }
+
+        recoveryCodeOutput.textContent =
+          `Bewaar deze code nu. Hij wordt niet opnieuw getoond: ${recoveryData.recoveryCode}`;
+        recoveryCodeOutput.hidden = false;
+        status.textContent =
+          "Herstelcode gemaakt. Bewaar hem veilig; de vorige code werkt niet meer.";
+      } catch (recoveryError) {
+        status.textContent =
+          `Herstelcode maken is niet gelukt: ${recoveryError.message}`;
+      } finally {
+        recoveryCodeButton.disabled = false;
+      }
+    });
+
     const { data, error } = await client.auth.getSession();
     if (error) {
       throw error;
@@ -152,10 +237,16 @@ async function initializeProfilePage() {
     if (!data.session?.user) {
       status.textContent = "Je bent niet ingelogd.";
       accountDetails.hidden = true;
+      if (recoverySection) {
+        recoverySection.hidden = false;
+      }
       return;
     }
 
     let user = data.session.user;
+    if (recoverySection) {
+      recoverySection.hidden = true;
+    }
     document.querySelector("#profiel-email").textContent =
       user.email || "E-mailadres niet beschikbaar";
     updateProfileAvatar(avatar, user);
@@ -2162,35 +2253,10 @@ if (
         <div class="agenda-account-actions">
           <button type="submit" value="login">Inloggen</button>
           <button type="submit" value="signup">Account aanmaken</button>
-          <button type="button" data-reset-password>Herstellen met herstelcode</button>
+          <button type="button" data-profile-recovery>Wachtwoord herstellen</button>
         </div>
       `;
       signedOutView.append(intro, authForm);
-
-      const codeRecoveryForm = document.createElement("form");
-      codeRecoveryForm.className = "agenda-item-form";
-      codeRecoveryForm.hidden = true;
-      codeRecoveryForm.innerHTML = `
-        <strong>Wachtwoord herstellen met herstelcode</strong>
-        <p>Vul het e-mailadres van je account en je eerder bewaarde herstelcode in.</p>
-        <label class="agenda-form-field">E-mailadres
-          <input name="email" type="email" autocomplete="email" required>
-        </label>
-        <label class="agenda-form-field">Herstelcode
-          <input name="recovery_code" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="32" pattern="[0-9a-fA-F]{32}" required>
-        </label>
-        <label class="agenda-form-field">Nieuw wachtwoord
-          <input name="password" type="password" autocomplete="new-password" minlength="6" required>
-        </label>
-        <label class="agenda-form-field">Herhaal nieuw wachtwoord
-          <input name="password_confirmation" type="password" autocomplete="new-password" minlength="6" required>
-        </label>
-        <div class="agenda-account-actions">
-          <button type="submit">Wachtwoord herstellen</button>
-          <button type="button" data-cancel-code-recovery>Annuleren</button>
-        </div>
-      `;
-      signedOutView.append(codeRecoveryForm);
 
       const recoveryForm = document.createElement("form");
       recoveryForm.className = "agenda-item-form";
@@ -2209,26 +2275,10 @@ if (
       const signedInView = document.createElement("div");
       signedInView.hidden = true;
       const signedInLabel = document.createElement("p");
-      const recoveryCodeIntro = document.createElement("p");
-      recoveryCodeIntro.textContent =
-        "Zonder e-mail kun je je wachtwoord alleen herstellen met een herstelcode. Maak die nu en bewaar hem op een veilige plek.";
-      const recoveryCodeButton = document.createElement("button");
-      recoveryCodeButton.type = "button";
-      recoveryCodeButton.textContent = "Herstelcode maken/vervangen";
-      const recoveryCodeOutput = document.createElement("p");
-      recoveryCodeOutput.className = "agenda-account-message";
-      recoveryCodeOutput.hidden = true;
-      recoveryCodeOutput.style.overflowWrap = "anywhere";
       const signOutButton = document.createElement("button");
       signOutButton.type = "button";
       signOutButton.textContent = "Uitloggen";
-      signedInView.append(
-        signedInLabel,
-        recoveryCodeIntro,
-        recoveryCodeButton,
-        recoveryCodeOutput,
-        signOutButton,
-      );
+      signedInView.append(signedInLabel, signOutButton);
 
       const accountMessage = document.createElement("p");
       accountMessage.className = "agenda-account-message";
@@ -2361,12 +2411,9 @@ if (
         addButton,
         accountMessage,
         authForm,
-        codeRecoveryForm,
         itemForm,
         profileLink,
         recoveryForm,
-        recoveryCodeButton,
-        recoveryCodeOutput,
         updateRepeatControls,
         signedInLabel,
         signedInView,
@@ -2401,10 +2448,6 @@ if (
       const isRecoveryCallback = callbackParams.get("type") === "recovery";
 
       function setSignedIn(user) {
-        if (!user || currentUser?.id !== user.id) {
-          ui.recoveryCodeOutput.textContent = "";
-          ui.recoveryCodeOutput.hidden = true;
-        }
         currentUser = user;
         ui.accountPanel.hidden = false;
         ui.signedOutView.hidden = Boolean(user);
@@ -2732,46 +2775,11 @@ if (
         ui.itemForm.elements.namedItem("title").focus();
       });
 
-      async function createRecoveryCode(confirmReplacement) {
-        if (
-          confirmReplacement &&
-          !window.confirm(
-            "De nieuwe herstelcode vervangt een eventuele vorige code. Bewaar hem veilig; zonder code kun je je wachtwoord niet herstellen. Doorgaan?",
-          )
-        ) {
-          return false;
-        }
-
-        ui.recoveryCodeButton.disabled = true;
-        ui.recoveryCodeOutput.hidden = true;
-        try {
-          const { data, error } = await client.functions.invoke(
-            "password-recovery",
-            { body: { action: "create" } },
-          );
-          if (error) {
-            throw error;
-          }
-          if (typeof data?.recoveryCode !== "string") {
-            throw new Error("De server heeft geen herstelcode teruggestuurd.");
-          }
-
-          ui.recoveryCodeOutput.textContent =
-            `Bewaar deze code nu. Hij wordt niet opnieuw getoond: ${data.recoveryCode}`;
-          ui.recoveryCodeOutput.hidden = false;
-          showAccountMessage(
-            "Herstelcode gemaakt. Bewaar hem veilig; de vorige code werkt niet meer.",
-          );
-          return true;
-        } catch (error) {
-          showAccountMessage(
-            `Herstelcode maken is niet gelukt: ${error.message}`,
-          );
-          return false;
-        } finally {
-          ui.recoveryCodeButton.disabled = false;
-        }
-      }
+      ui.authForm
+        .querySelector("[data-profile-recovery]")
+        .addEventListener("click", () => {
+          window.location.assign("profiel.html?herstel=1");
+        });
 
       ui.authForm.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -2805,84 +2813,11 @@ if (
           );
         } else if (submitter.value === "signup" && !result.data.session) {
           showAccountMessage(
-            "Account aangemaakt. Log in en maak daarna een herstelcode aan.",
+            "Account aangemaakt. Log in en maak daarna een herstelcode op je profielpagina.",
           );
-        } else if (submitter.value === "signup") {
-          await createRecoveryCode(false);
         } else {
           showAccountMessage("Je bent ingelogd.");
         }
-      });
-
-      ui.authForm
-        .querySelector("[data-reset-password]")
-        .addEventListener("click", () => {
-          const emailInput = ui.authForm.elements.namedItem("email");
-          const recoveryEmail = ui.codeRecoveryForm.elements.namedItem("email");
-          recoveryEmail.value = emailInput.value.trim();
-          ui.authForm.hidden = true;
-          ui.codeRecoveryForm.hidden = false;
-          showAccountMessage(
-            "Voer je e-mailadres en de herstelcode in die je eerder hebt bewaard.",
-          );
-        });
-
-      ui.codeRecoveryForm
-        .querySelector("[data-cancel-code-recovery]")
-        .addEventListener("click", () => {
-          ui.codeRecoveryForm.reset();
-          ui.codeRecoveryForm.hidden = true;
-          ui.authForm.hidden = false;
-        });
-
-      ui.codeRecoveryForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const formData = new FormData(ui.codeRecoveryForm);
-        const password = String(formData.get("password"));
-        if (password !== String(formData.get("password_confirmation"))) {
-          showAccountMessage("De nieuwe wachtwoorden zijn niet hetzelfde.");
-          return;
-        }
-
-        const submitButton = ui.codeRecoveryForm.querySelector(
-          'button[type="submit"]',
-        );
-        submitButton.disabled = true;
-        try {
-          const { data, error } = await client.functions.invoke(
-            "password-recovery",
-            {
-              body: {
-                action: "reset",
-                email: String(formData.get("email")).trim(),
-                recoveryCode: String(formData.get("recovery_code")),
-                password,
-              },
-            },
-          );
-          if (error) {
-            throw error;
-          }
-
-          ui.authForm.elements.namedItem("email").value =
-            String(formData.get("email")).trim();
-          ui.codeRecoveryForm.reset();
-          ui.codeRecoveryForm.hidden = true;
-          ui.authForm.hidden = false;
-          showAccountMessage(
-            data?.message || "Je wachtwoord is hersteld. Je kunt nu inloggen.",
-          );
-        } catch (error) {
-          showAccountMessage(
-            `Wachtwoord herstellen is niet gelukt: ${error.message}`,
-          );
-        } finally {
-          submitButton.disabled = false;
-        }
-      });
-
-      ui.recoveryCodeButton.addEventListener("click", async () => {
-        await createRecoveryCode(true);
       });
 
       if (recoveryError) {
