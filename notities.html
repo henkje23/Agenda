@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <meta
+      name="description"
+      content="Bewaar je persoonlijke notities veilig bij je agenda."
+    />
+    <title>Notities - Agenda</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        position: relative;
+        width: min(100% - 32px, 760px);
+        margin: 0 auto;
+        padding: 24px 0 48px;
+        color: #1f2937;
+        background: #eef2f7;
+        font-family: Arial, sans-serif;
+      }
+
+      h1 {
+        margin: 0 64px 8px 0;
+        color: #183153;
+        font-size: clamp(28px, 7vw, 36px);
+      }
+
+      .pagina-intro {
+        margin: 0 0 20px;
+        color: #526174;
+        line-height: 1.6;
+      }
+
+      .dagen-navigatie {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 20px;
+      }
+
+      .dagen-navigatie a,
+      .functies-menu summary {
+        display: block;
+        min-height: 42px;
+        padding: 11px 14px;
+        border: 1px solid #d6deea;
+        border-radius: 8px;
+        background: #fff;
+        color: #183153;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .dagen-navigatie a:hover,
+      .dagen-navigatie a:focus-visible,
+      .functies-menu[open] summary {
+        background: #183153;
+        color: #fff;
+      }
+
+      .functies-menu {
+        position: relative;
+      }
+
+      .functies-menu summary {
+        list-style: none;
+      }
+
+      .functies-menu summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .functies-menu summary::after {
+        content: " ▾";
+      }
+
+      .functies-menu-link {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        z-index: 10;
+        min-width: 150px;
+        box-shadow: 0 8px 24px rgb(24 49 83 / 14%);
+      }
+
+      .functies-menu-link[aria-current="page"] {
+        background: #e8f1ff;
+      }
+
+      .notities-hoofd {
+        display: grid;
+        gap: 16px;
+      }
+
+      .notities-balk {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .notities-balk h2 {
+        margin: 0;
+        color: #183153;
+        font-size: 20px;
+      }
+
+      .notitie-knop {
+        display: inline-flex;
+        min-height: 42px;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 9px 14px;
+        border: 1px solid #183153;
+        border-radius: 8px;
+        background: #183153;
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 600;
+      }
+
+      .notitie-knop:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      .notitie-editor,
+      .notitie-kaart,
+      .notities-aanmelden {
+        min-width: 0;
+        padding: 18px;
+        border: 1px solid #d6deea;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 6px 20px rgb(24 49 83 / 7%);
+      }
+
+      .notitie-editor[hidden],
+      .notities-aanmelden[hidden],
+      #notitie-annuleren[hidden],
+      #notities-leeg[hidden],
+      #notities-lijst[hidden],
+      #notitie-nieuw[hidden],
+      .notities-profiel-link[hidden] {
+        display: none;
+      }
+
+      .notitie-editor h2 {
+        margin: 0 0 14px;
+        color: #183153;
+        font-size: 20px;
+      }
+
+      .notitie-veld {
+        display: grid;
+        gap: 7px;
+        margin-bottom: 14px;
+        color: #334155;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .notitie-veld input,
+      .notitie-veld textarea {
+        width: 100%;
+        min-height: 44px;
+        padding: 11px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #fff;
+        color: #1f2937;
+        font: inherit;
+        font-size: 16px;
+      }
+
+      .notitie-veld textarea {
+        min-height: 150px;
+        resize: vertical;
+        line-height: 1.55;
+      }
+
+      .notitie-veld input:focus,
+      .notitie-veld textarea:focus {
+        border-color: #3978c5;
+        outline: 3px solid rgb(57 120 197 / 18%);
+      }
+
+      .notitie-editor-acties,
+      .notitie-acties {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .notitie-knop-secundair {
+        border-color: #cbd5e1;
+        background: #fff;
+        color: #183153;
+      }
+
+      .notitie-knop-verwijderen {
+        border-color: #f0c7ca;
+        background: #fff;
+        color: #a4262c;
+      }
+
+      .notities-status {
+        min-height: 22px;
+        margin: 0;
+        color: #526174;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .notities-status[data-state="error"] {
+        color: #a4262c;
+      }
+
+      .notities-aanmelden {
+        line-height: 1.6;
+      }
+
+      .notities-aanmelden a {
+        color: #245da8;
+        font-weight: 600;
+      }
+
+      .notities-lijst {
+        display: grid;
+        gap: 12px;
+      }
+
+      .notitie-kaart {
+        overflow-wrap: anywhere;
+      }
+
+      .notitie-kaart h2 {
+        margin: 0 0 10px;
+        color: #183153;
+        font-size: 19px;
+      }
+
+      .notitie-tekst {
+        margin: 0 0 14px;
+        color: #334155;
+        line-height: 1.65;
+        white-space: pre-wrap;
+      }
+
+      .notitie-datum {
+        display: block;
+        margin-bottom: 14px;
+        color: #64748b;
+        font-size: 12px;
+      }
+
+      .notities-profiel-link {
+        position: fixed;
+        top: 18px;
+        right: max(16px, calc((100vw - 760px) / 2));
+        z-index: 20;
+        display: grid;
+        width: 48px;
+        height: 48px;
+        place-items: center;
+        overflow: hidden;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        background: #183153;
+        color: #fff;
+        box-shadow: 0 2px 8px rgb(24 49 83 / 20%);
+        font-size: 18px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .notities-profiel-link img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      @media (max-width: 520px) {
+        body {
+          width: min(100% - 24px, 760px);
+          padding-top: 16px;
+        }
+
+        .dagen-navigatie {
+          gap: 6px;
+        }
+
+        .dagen-navigatie a,
+        .functies-menu summary {
+          min-height: 40px;
+          padding: 10px;
+          font-size: 13px;
+        }
+
+        .notitie-editor,
+        .notitie-kaart,
+        .notities-aanmelden {
+          padding: 15px;
+        }
+
+        .notities-balk {
+          align-items: flex-start;
+        }
+
+        .notitie-knop {
+          min-height: 44px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Notities</h1>
+    <p class="pagina-intro">
+      Bewaar ideeën en belangrijke informatie. Je notities zijn alleen zichtbaar
+      voor jouw account.
+    </p>
+
+    <nav class="dagen-navigatie" aria-label="Navigatie">
+      <a href="index.html?dag=maandag">Maandag</a>
+      <a href="dinsdag.html">Dinsdag</a>
+      <a href="woensdag.html">Woensdag</a>
+      <a href="donderdag.html">Donderdag</a>
+      <a href="vrijdag.html">Vrijdag</a>
+      <a href="zaterdag.html">Zaterdag</a>
+      <a href="zondag.html">Zondag</a>
+      <details class="functies-menu">
+        <summary>Functies</summary>
+        <a
+          class="dagen-navigatie-link functies-menu-link"
+          href="notities.html"
+          aria-current="page"
+          >Notities</a
+        >
+      </details>
+    </nav>
+    <a
+      class="notities-profiel-link"
+      href="profiel.html"
+      aria-label="Naar profiel"
+      title="Naar profiel"
+      hidden
+      >👤</a
+    >
+
+    <main class="notities-hoofd">
+      <section id="notities-aanmelden" class="notities-aanmelden" hidden>
+        <strong>Log in om je notities te bekijken.</strong>
+        <p>
+          Gebruik hetzelfde account als voor je agenda.
+          <a href="index.html?dag=maandag">Ga naar de agenda om in te loggen</a
+          >.
+        </p>
+      </section>
+
+      <div class="notities-balk">
+        <h2>Mijn notities</h2>
+        <button id="notitie-nieuw" class="notitie-knop" type="button" hidden>
+          <span aria-hidden="true">+</span> Nieuwe notitie
+        </button>
+      </div>
+
+      <p
+        id="notities-status"
+        class="notities-status"
+        role="status"
+        aria-live="polite"
+      >
+        Notities laden...
+      </p>
+
+      <form id="notitie-form" class="notitie-editor" hidden>
+        <h2>Nieuwe notitie</h2>
+        <label class="notitie-veld" for="notitie-titel">
+          Titel
+          <input
+            id="notitie-titel"
+            name="title"
+            type="text"
+            maxlength="150"
+            placeholder="Geef je notitie een titel"
+            required
+          />
+        </label>
+        <label class="notitie-veld" for="notitie-inhoud">
+          Notitie
+          <textarea
+            id="notitie-inhoud"
+            name="content"
+            maxlength="20000"
+            placeholder="Schrijf hier je notitie."
+            required
+          ></textarea>
+        </label>
+        <div class="notitie-editor-acties">
+          <button class="notitie-knop" type="submit">Notitie opslaan</button>
+          <button
+            id="notitie-annuleren"
+            class="notitie-knop notitie-knop-secundair"
+            type="button"
+            hidden
+          >
+            Annuleren
+          </button>
+        </div>
+      </form>
+
+      <p id="notities-leeg" class="notities-aanmelden" hidden>
+        Je hebt nog geen notities. Maak je eerste notitie met de knop hierboven.
+      </p>
+      <section
+        id="notities-lijst"
+        class="notities-lijst"
+        aria-label="Opgeslagen notities"
+        hidden
+      ></section>
+    </main>
+    <script src="index.js"></script>
+  </body>
+</html>
