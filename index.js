@@ -665,12 +665,15 @@ function setupFunctionsNavigation() {
 
 async function initializeTodoPage() {
   const form = document.querySelector("#todo-formulier");
+  const formTitle = document.querySelector("#todo-formulier-titel");
+  const newTaskButton = document.querySelector("#todo-nieuw");
   const input = document.querySelector("#todo-invoer");
   const saveButton = document.querySelector("#todo-bewaren");
   const cancelButton = document.querySelector("#todo-annuleren");
   const list = document.querySelector("#todo-lijst");
   const emptyMessage = document.querySelector("#todo-leeg");
   const count = document.querySelector("#todo-teller");
+  const progress = document.querySelector("#todo-progress");
   const status = document.querySelector("#todo-status");
   const loginPrompt = document.querySelector("#todo-aanmelden");
   const todoPanel = document.querySelector("#todo-paneel");
@@ -678,6 +681,7 @@ async function initializeTodoPage() {
   let tasks = [];
   let user = null;
   let editingId = null;
+  let formOpen = false;
   let activeFilter = "alle";
   let requestNumber = 0;
 
@@ -799,6 +803,10 @@ async function initializeTodoPage() {
 
       const completedCount = tasks.filter((task) => task.completed).length;
       count.textContent = `${completedCount} van ${tasks.length} voltooid`;
+      progress.setAttribute("aria-valuemax", tasks.length);
+      progress.setAttribute("aria-valuenow", completedCount);
+      progress.querySelector(".todo-voortgang-vulling").style.width =
+        `${tasks.length ? (completedCount / tasks.length) * 100 : 0}%`;
       emptyMessage.hidden = visibleTasks.length > 0;
       emptyMessage.textContent =
         tasks.length === 0
@@ -856,22 +864,42 @@ async function initializeTodoPage() {
     function startEditing(task) {
       editingId = task.id;
       input.value = task.task;
+      formTitle.textContent = "Taak bewerken";
       saveButton.textContent = "Wijziging opslaan";
       cancelButton.hidden = false;
+      formOpen = true;
+      form.hidden = false;
+      newTaskButton.setAttribute("aria-expanded", "true");
+      input.focus();
+    }
+
+    function startNewTask() {
+      editingId = null;
+      form.reset();
+      formTitle.textContent = "Nieuwe taak";
+      saveButton.textContent = "Taak toevoegen";
+      cancelButton.hidden = false;
+      formOpen = true;
+      form.hidden = false;
+      newTaskButton.setAttribute("aria-expanded", "true");
       input.focus();
     }
 
     function stopEditing() {
       editingId = null;
       form.reset();
+      formTitle.textContent = "Nieuwe taak";
       saveButton.textContent = "Taak toevoegen";
       cancelButton.hidden = true;
+      formOpen = false;
+      form.hidden = true;
+      newTaskButton.setAttribute("aria-expanded", "false");
     }
 
     function updateSignedInState(signedInUser) {
       user = signedInUser;
       loginPrompt.hidden = Boolean(user);
-      form.hidden = !user;
+      form.hidden = !user || !formOpen;
       todoPanel.hidden = !user;
 
       if (user) {
@@ -924,7 +952,7 @@ async function initializeTodoPage() {
           form.reset();
           showStatus("Taak opgeslagen.");
           await loadTasks();
-          input.focus();
+          stopEditing();
         }
       } catch (error) {
         console.error("Taak opslaan is mislukt.", error);
@@ -937,6 +965,7 @@ async function initializeTodoPage() {
       }
     });
 
+    newTaskButton.addEventListener("click", startNewTask);
     cancelButton.addEventListener("click", stopEditing);
     filterButtons.forEach((button) => {
       button.addEventListener("click", () => {
@@ -1740,7 +1769,7 @@ if (
       dayHeader.append(heading);
 
       const indicator = document.createElement("div");
-      indicator.className = "agenda-time-indicator";
+      indicator.className = "agenda-time-indicators";
       indicator.setAttribute("aria-hidden", "true");
 
       const dayList =
@@ -1791,8 +1820,8 @@ if (
       .agenda-filter-field input, .agenda-filter-field select { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #1f2937; font: inherit; font-size: 16px; }
       .agenda-search-field { flex-basis: 240px; }
       .agenda-category-badge { display: inline-block; margin: 5px 5px 0 0; padding: 2px 6px; border-radius: 999px; background: #e8f1ff; color: #183153; font-size: 11px; }
-      .agenda-time-indicator { position: absolute; z-index: 30; top: 0; right: 8px; left: 8px; height: 2px; background: #e5484d; visibility: hidden; pointer-events: none; }
-      .agenda-time-indicator.is-visible { visibility: visible; }
+      .agenda-time-indicators { position: absolute; z-index: 30; inset: 0; pointer-events: none; }
+      .agenda-time-indicator { position: absolute; height: 2px; background: #e5484d; }
       .agenda-month-navigation { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
       .agenda-month-navigation button { min-height: 40px; padding: 8px 12px; border: 1px solid #d6deea; border-radius: 8px; background: #fff; color: #183153; cursor: pointer; font: inherit; font-weight: 600; }
       .agenda-month-navigation button:hover, .agenda-month-navigation button:focus-visible { background: #183153; color: #fff; }
@@ -2882,9 +2911,7 @@ if (
           currentItems = [];
           ui.itemForm.hidden = true;
           dayLists.forEach((dayList) => dayList.replaceChildren());
-          dayIndicators.forEach((indicator) =>
-            indicator.classList.remove("is-visible"),
-          );
+          dayIndicators.forEach((indicator) => indicator.replaceChildren());
           if (recoveryError) {
             showAccountMessage(
               recoveryError === "otp_expired"
@@ -3476,13 +3503,11 @@ if (
         const dayList = dayLists.get(day);
         const panel = dayPanels.get(day);
         const indicator = dayIndicators.get(day);
+        indicator.replaceChildren();
         const items = Array.from(
           panel.querySelectorAll("li[data-start][data-end]"),
         );
         const activeItems = [];
-        let currentStart;
-        let currentEnd;
-        let currentItem = null;
         if (isCurrentWeek && day === currentDay) {
           items.forEach((item) => {
             const start = Number(item.dataset.start);
@@ -3509,46 +3534,17 @@ if (
         indicatorItems.forEach(({ item }) =>
           item.classList.add("planning-actief"),
         );
-        const currentEvent = indicatorItems.reduce((current, candidate) =>
-          !current ||
-          candidate.start > current.start ||
-          (candidate.start === current.start && candidate.end < current.end)
-            ? candidate
-            : current,
-        null);
-        currentItem = currentEvent?.item || null;
-        currentStart = currentEvent?.start;
-        currentEnd = currentEvent?.end;
-
-        indicator.classList.remove("is-visible");
-
-        if (!currentItem) {
-          indicator.style.removeProperty("left");
-          indicator.style.removeProperty("right");
-          indicator.style.removeProperty("width");
-          return;
-        }
-
-        const elapsedFraction =
-          (currentMinutes - currentStart) / (currentEnd - currentStart);
-        const itemRect = currentItem.getBoundingClientRect();
         const panelRect = panel.getBoundingClientRect();
-        const activeRects = indicatorItems.map(({ item }) =>
-          item.getBoundingClientRect(),
-        );
-        const left = Math.min(...activeRects.map((rect) => rect.left));
-        const right = Math.max(...activeRects.map((rect) => rect.right));
-        const top =
-          itemRect.top -
-          panelRect.top +
-          panel.scrollTop +
-          itemRect.height * elapsedFraction;
-
-        indicator.style.left = `${left - panelRect.left - panel.clientLeft + panel.scrollLeft}px`;
-        indicator.style.right = "auto";
-        indicator.style.width = `${right - left}px`;
-        indicator.style.top = `${top}px`;
-        indicator.classList.add("is-visible");
+        indicatorItems.forEach(({ item, start, end }) => {
+          const elapsedFraction = (currentMinutes - start) / (end - start);
+          const itemRect = item.getBoundingClientRect();
+          const timeIndicator = document.createElement("div");
+          timeIndicator.className = "agenda-time-indicator";
+          timeIndicator.style.left = `${itemRect.left - panelRect.left - panel.clientLeft + panel.scrollLeft}px`;
+          timeIndicator.style.width = `${itemRect.width}px`;
+          timeIndicator.style.top = `${itemRect.top - panelRect.top + panel.scrollTop + itemRect.height * elapsedFraction}px`;
+          indicator.append(timeIndicator);
+        });
       });
     }
 

@@ -3,13 +3,423 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#183153" />
+    <meta
+      name="description"
+      content="Maak en beheer je persoonlijke taken in je agenda."
+    />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <meta name="theme-color" content="#183153" />
     <script src="pwa.js" defer></script>
     <title>Todo - agenda</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        width: min(100% - 32px, 760px);
+        margin: 0 auto;
+        padding: 32px 0 48px;
+        color: #1f2937;
+        background:
+          radial-gradient(ellipse at 90% 0%, rgb(79 131 204 / 12%), transparent 32%),
+          #eef2f7;
+        font-family: Arial, sans-serif;
+      }
+
+      .page-header {
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: #4f83cc;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        color: #183153;
+        font-size: clamp(32px, 7vw, 42px);
+        letter-spacing: -0.04em;
+      }
+
+      .page-intro {
+        margin: 8px 0 0;
+        color: #64748b;
+        font-size: 15px;
+        line-height: 1.5;
+      }
+
+      .dagen-navigatie {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 20px;
+      }
+
+      .dagen-navigatie a {
+        padding: 9px 13px;
+        border: 1px solid #d6deea;
+        border-radius: 999px;
+        background: rgb(255 255 255 / 78%);
+        color: #183153;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        transition:
+          background-color 0.2s,
+          border-color 0.2s,
+          color 0.2s,
+          transform 0.2s;
+      }
+
+      .dagen-navigatie a:hover,
+      .dagen-navigatie a:focus-visible,
+      .dagen-navigatie a[aria-current="page"] {
+        border-color: #183153;
+        background: #183153;
+        color: #fff;
+        transform: translateY(-1px);
+      }
+
+      .todo-hoofd {
+        display: grid;
+        gap: 14px;
+      }
+
+      .todo-paneel,
+      .todo-formulier,
+      .todo-aanmelden {
+        min-width: 0;
+        padding: 22px;
+        border: 1px solid #dce5f0;
+        border-radius: 16px;
+        background: #fff;
+        box-shadow: 0 10px 28px rgb(24 49 83 / 7%);
+      }
+
+      .todo-paneel[hidden],
+      .todo-formulier[hidden],
+      .todo-aanmelden[hidden] {
+        display: none;
+      }
+
+      .todo-aanmelden {
+        line-height: 1.6;
+      }
+
+      .todo-aanmelden a {
+        color: #245da8;
+        font-weight: 600;
+      }
+
+      .todo-aanmelden p {
+        margin: 8px 0 0;
+      }
+
+      .todo-status {
+        margin: 0;
+        color: #64748b;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .todo-status[data-state="error"] {
+        color: #b42318;
+      }
+
+      .todo-status:empty {
+        display: none;
+      }
+
+      .todo-formulier {
+        display: grid;
+        gap: 14px;
+      }
+
+      .todo-formulier h2,
+      .todo-balk h2 {
+        margin: 0;
+        color: #183153;
+        font-size: 20px;
+      }
+
+      .todo-veld {
+        display: grid;
+        gap: 7px;
+        color: #344256;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .todo-veld input {
+        width: 100%;
+        min-height: 46px;
+        padding: 11px 13px;
+        border: 1px solid #cbd5e1;
+        border-radius: 9px;
+        background: #fff;
+        color: #1f2937;
+        font: inherit;
+        font-weight: 400;
+      }
+
+      .todo-veld input:focus {
+        border-color: #4f83cc;
+        outline: 3px solid rgb(79 131 204 / 18%);
+      }
+
+      .todo-acties-formulier {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .todo-knop {
+        display: inline-flex;
+        min-height: 42px;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 9px 14px;
+        border: 1px solid #183153;
+        border-radius: 9px;
+        background: #183153;
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 600;
+        transition:
+          background-color 0.2s,
+          transform 0.2s;
+      }
+
+      .todo-knop:hover:not(:disabled) {
+        background: #25466f;
+        transform: translateY(-1px);
+      }
+
+      .todo-knop:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      .todo-knop-secundair {
+        border-color: #cbd5e1;
+        background: #fff;
+        color: #183153;
+      }
+
+      .todo-knop-secundair:hover:not(:disabled) {
+        background: #f1f5f9;
+      }
+
+      .todo-knop-verwijderen {
+        border-color: #f0c7ca;
+        background: #fff;
+        color: #a52b35;
+      }
+
+      .todo-knop-verwijderen:hover:not(:disabled) {
+        background: #fff1f2;
+      }
+
+      .todo-balk {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+
+      .todo-nieuw {
+        flex-shrink: 0;
+      }
+
+      .todo-nieuw-plus {
+        font-size: 19px;
+        line-height: 1;
+      }
+
+      .todo-teller {
+        flex-shrink: 0;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: #edf4ff;
+        color: #315f9c;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .todo-voortgang {
+        height: 7px;
+        margin: 0 0 18px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #e8edf4;
+      }
+
+      .todo-voortgang-vulling {
+        width: 0;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #4f83cc, #319263);
+        transition: width 0.25s ease;
+      }
+
+      .todo-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-bottom: 14px;
+      }
+
+      .todo-filter {
+        min-height: 36px;
+        padding: 7px 12px;
+        border: 1px solid #d6deea;
+        border-radius: 999px;
+        background: #fff;
+        color: #475569;
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .todo-filter[aria-pressed="true"] {
+        border-color: #183153;
+        background: #e8f1ff;
+        color: #183153;
+      }
+
+      .todo-lijst {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .todo-item {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 12px;
+        padding: 13px;
+        border: 1px solid #e1e8f0;
+        border-radius: 12px;
+        background: #fbfcfe;
+      }
+
+      .todo-checkbox {
+        width: 20px;
+        height: 20px;
+        flex: 0 0 20px;
+        accent-color: #319263;
+        cursor: pointer;
+      }
+
+      .todo-tekst {
+        min-width: 0;
+        flex: 1;
+        overflow-wrap: anywhere;
+        color: #27364a;
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      .todo-item.is-voltooid {
+        border-color: #cfe7d9;
+        background: #f2faf5;
+      }
+
+      .todo-item.is-voltooid .todo-tekst {
+        color: #718096;
+        text-decoration: line-through;
+      }
+
+      .todo-acties {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 6px;
+      }
+
+      .todo-acties .todo-knop {
+        min-height: 36px;
+        padding: 7px 10px;
+        font-size: 13px;
+      }
+
+      .todo-leeg {
+        margin: 0;
+        padding: 20px;
+        border: 1px dashed #cbd5e1;
+        border-radius: 12px;
+        color: #64748b;
+        line-height: 1.5;
+        text-align: center;
+      }
+
+      .todo-leeg[hidden],
+      #todo-annuleren[hidden] {
+        display: none;
+      }
+
+      @media (max-width: 520px) {
+        body {
+          padding-top: 24px;
+        }
+
+        .dagen-navigatie {
+          gap: 7px;
+        }
+
+        .dagen-navigatie a {
+          padding: 8px 11px;
+          font-size: 13px;
+        }
+
+        .todo-paneel,
+        .todo-formulier,
+        .todo-aanmelden {
+          padding: 17px;
+        }
+
+        .todo-item {
+          flex-wrap: wrap;
+        }
+
+        .todo-acties {
+          width: 100%;
+          padding-left: 32px;
+          justify-content: flex-start;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
   </head>
   <body>
+    <header class="page-header">
+      <p class="eyebrow">Jouw agenda</p>
+      <h1>Todo</h1>
+      <p class="page-intro">Maak je eigen takenlijst en houd bij wat al klaar is.</p>
+    </header>
+
     <nav class="dagen-navigatie" aria-label="Dagen van de week">
       <a href="index.html?dag=maandag">Maandag</a>
       <a href="dinsdag.html">Dinsdag</a>
@@ -19,22 +429,98 @@
       <a href="zaterdag.html">Zaterdag</a>
       <a href="zondag.html">Zondag</a>
       <a href="notities.html">Notities</a>
-      <a href="todo.html" aria-current="page">Todo</a>
     </nav>
-    <h1>Todo</h1>
-    <ul>
-  <li>
-    <input type="checkbox" id="taak1" name="takenlijst">
-    <label for="taak1">vb</label>
-  </li>
-  <li>
-    <input type="checkbox" id="taak2" name="takenlijst">
-    <label for="taak2">vb-2</label>
-  </li>
-  <li>
-    <input type="checkbox" id="taak3" name="takenlijst">
-    <label for="taak3">vb-3</label>
-  </li>
-</ul>
 
+    <main class="todo-hoofd">
+      <section id="todo-aanmelden" class="todo-aanmelden" hidden>
+        <strong>Log in om je taken te beheren.</strong>
+        <p>
+          Je taken worden privé bij je account opgeslagen.
+          <a href="index.html?dag=maandag">Ga naar de agenda om in te loggen</a>.
+        </p>
+      </section>
+
+      <p id="todo-status" class="todo-status" role="status" aria-live="polite">
+        Je taken laden...
+      </p>
+
+      <form id="todo-formulier" class="todo-formulier" hidden>
+        <h2 id="todo-formulier-titel">Nieuwe taak</h2>
+        <label class="todo-veld" for="todo-invoer">
+          Wat moet je doen?
+          <input
+            id="todo-invoer"
+            name="task"
+            type="text"
+            maxlength="200"
+            autocomplete="off"
+            placeholder="Bijvoorbeeld: huiswerk maken"
+            required
+          />
+        </label>
+        <div class="todo-acties-formulier">
+          <button id="todo-bewaren" class="todo-knop" type="submit">
+            Taak toevoegen
+          </button>
+          <button
+            id="todo-annuleren"
+            class="todo-knop todo-knop-secundair"
+            type="button"
+            hidden
+          >
+            Annuleren
+          </button>
+        </div>
+      </form>
+
+      <section id="todo-paneel" class="todo-paneel" hidden>
+        <div class="todo-balk">
+          <h2>Mijn taken</h2>
+          <div class="todo-acties-formulier">
+            <span id="todo-teller" class="todo-teller" aria-live="polite"></span>
+            <button
+              id="todo-nieuw"
+              class="todo-knop todo-nieuw"
+              type="button"
+              aria-expanded="false"
+              aria-controls="todo-formulier"
+            >
+              <span class="todo-nieuw-plus" aria-hidden="true">+</span>
+              Nieuwe taak
+            </button>
+          </div>
+        </div>
+        <div
+          id="todo-progress"
+          class="todo-voortgang"
+          role="progressbar"
+          aria-label="Voortgang taken"
+          aria-valuemin="0"
+          aria-valuemax="0"
+          aria-valuenow="0"
+        >
+          <div class="todo-voortgang-vulling"></div>
+        </div>
+        <div class="todo-filters" aria-label="Filter taken">
+          <button class="todo-filter" type="button" data-filter="alle" aria-pressed="true">
+            Alle
+          </button>
+          <button class="todo-filter" type="button" data-filter="open" aria-pressed="false">
+            Open
+          </button>
+          <button
+            class="todo-filter"
+            type="button"
+            data-filter="voltooid"
+            aria-pressed="false"
+          >
+            Voltooid
+          </button>
+        </div>
+        <p id="todo-leeg" class="todo-leeg" hidden></p>
+        <ul id="todo-lijst" class="todo-lijst" aria-label="Opgeslagen taken"></ul>
+      </section>
+    </main>
+    <script src="index.js"></script>
+  </body>
 </html>
