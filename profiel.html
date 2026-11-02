@@ -162,6 +162,7 @@
       }
 
       .profiel-herstel input,
+      .profiel-herstel select,
       .profiel-herstel button {
         min-height: 40px;
         padding: 8px 10px;
@@ -253,6 +254,42 @@
         <h2>Account</h2>
         <p>Ingelogd als <strong id="profiel-email"></strong></p>
         <section class="profiel-herstel">
+          <h2>Land en regio</h2>
+          <p>Deze keuze bepaalt welke feestdagen en schoolvakanties in je agenda staan.</p>
+          <form id="profiel-locatie-form">
+            <label>Land
+              <select id="profiel-land" name="country">
+                <option value="BE">België</option>
+                <option value="NL">Nederland</option>
+              </select>
+            </label>
+            <label>Regio voor schoolvakanties
+              <select id="profiel-regio" name="region" required></select>
+            </label>
+            <button type="submit">Land en regio opslaan</button>
+          </form>
+          <p id="profiel-locatie-status" role="status" aria-live="polite"></p>
+          <button id="profiel-schoolvakanties-toggle" type="button">
+            Schoolvakanties uitschakelen
+          </button>
+          <p id="profiel-schoolvakanties-status" role="status" aria-live="polite"></p>
+        </section>
+        <section class="profiel-herstel">
+          <h2>Taal</h2>
+          <p>Je taal bepaalt de taal van de hele agenda.</p>
+          <form id="profiel-taal-form">
+            <label for="profiel-taal">Taal</label>
+            <select id="profiel-taal" name="language">
+              <option value="nl">Nederlands</option>
+              <option value="en">Engels</option>
+              <option value="fr">Frans</option>
+              <option value="de">Duits</option>
+            </select>
+            <button type="submit">Taal opslaan</button>
+          </form>
+          <p id="profiel-taal-status" role="status" aria-live="polite"></p>
+        </section>
+        <section class="profiel-herstel">
           <h2>Wachtwoord herstellen</h2>
           <p>
             Maak een herstelcode en bewaar die veilig. Zonder e-mail kun je
@@ -279,6 +316,10 @@
       <section id="profiel-wachtwoord-herstellen" class="profiel-herstel" hidden>
         <h2>Wachtwoord herstellen met herstelcode</h2>
         <p>Vul het e-mailadres van je account, je bewaarde herstelcode en een nieuw wachtwoord in.</p>
+        <p>
+          Herstelcode kwijt? <a href="mailto:hendrikbrouns2@hotmail.com?subject=Nieuwe%20herstelcode%20aanvragen">Stuur mij een e-mail</a>;
+          dan kan hij je helpen met een nieuwe code.
+        </p>
         <form id="profiel-herstel-form">
           <label>E-mailadres
             <input name="email" type="email" autocomplete="email" required />
@@ -297,6 +338,7 @@
         <p id="profiel-herstel-status" role="status" aria-live="polite"></p>
       </section>
     </main>
+    <script src="i18n.js"></script>
     <script src="index.js"></script>
   </body>
 </html>

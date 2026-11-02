@@ -38,6 +38,202 @@ function formatLocalDate(date) {
   return `${year}-${month}-${day}`;
 }
 
+function getEasterSunday(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day, 12);
+}
+
+function getHolidayEntries(
+  country,
+  region,
+  focusYears,
+  { schoolHolidaysEnabled = true } = {},
+) {
+  const years = new Set(
+    focusYears.flatMap((year) =>
+      [year - 1, year, year + 1, year + 2],
+    ),
+  );
+  const entries = [];
+  const addHoliday = (title, startDate, endDate = startDate, category = "Feestdag") => {
+    const start = new Date(`${startDate}T12:00:00`);
+    entries.push({
+      id: `holiday-${country}-${region}-${startDate}-${title}`,
+      title,
+      day: weekdayNames[start.getDay()],
+      time: { start: 0, end: 1439 },
+      endTime: 1439,
+      startText: "00:00",
+      category,
+      isHoliday: true,
+      holidayStartDate: startDate,
+      holidayEndDate: endDate,
+      rowNumber: -entries.length - 1,
+    });
+  };
+  const addRange = (title, startDate, endDate) =>
+    addHoliday(title, startDate, endDate, "Schoolvakantie");
+
+  years.forEach((year) => {
+    const easter = getEasterSunday(year);
+    const easterDate = formatLocalDate(easter);
+    const offsetDate = (offset) => {
+      const date = new Date(easter);
+      date.setDate(date.getDate() + offset);
+      return formatLocalDate(date);
+    };
+
+    if (country === "NL") {
+      addHoliday("Nieuwjaarsdag", `${year}-01-01`);
+      addHoliday("Goede Vrijdag", offsetDate(-2));
+      addHoliday("Eerste paasdag", easterDate);
+      addHoliday("Tweede paasdag", offsetDate(1));
+      const kingsDay = new Date(year, 3, 27, 12);
+      if (kingsDay.getDay() === 0) {
+        kingsDay.setDate(kingsDay.getDate() - 1);
+      }
+      addHoliday("Koningsdag", formatLocalDate(kingsDay));
+      addHoliday("Bevrijdingsdag", `${year}-05-05`);
+      addHoliday("Hemelvaartsdag", offsetDate(39));
+      addHoliday("Eerste pinksterdag", offsetDate(49));
+      addHoliday("Tweede pinksterdag", offsetDate(50));
+      addHoliday("Eerste kerstdag", `${year}-12-25`);
+      addHoliday("Tweede kerstdag", `${year}-12-26`);
+    } else {
+      addHoliday("Nieuwjaar", `${year}-01-01`);
+      addHoliday("Paasmaandag", offsetDate(1));
+      addHoliday("Dag van de Arbeid", `${year}-05-01`);
+      addHoliday("Hemelvaart", offsetDate(39));
+      addHoliday("Pinkstermaandag", offsetDate(50));
+      addHoliday("Nationale feestdag", `${year}-07-21`);
+      addHoliday("Onze-Lieve-Vrouw Hemelvaart", `${year}-08-15`);
+      addHoliday("Allerheiligen", `${year}-11-01`);
+      addHoliday("Wapenstilstand", `${year}-11-11`);
+      addHoliday("Kerstmis", `${year}-12-25`);
+    }
+  });
+
+  const schoolYear2026 = {
+    BE: {
+      vlaanderen: [
+        ["Herfstvakantie", "2026-11-02", "2026-11-08"],
+        ["Kerstvakantie", "2026-12-21", "2027-01-03"],
+        ["Krokusvakantie", "2027-02-08", "2027-02-14"],
+        ["Paasvakantie", "2027-03-29", "2027-04-11"],
+        ["Zomervakantie", "2027-07-01", "2027-08-31"],
+      ],
+      wallonie: [
+        ["Herfstvakantie", "2026-10-19", "2026-11-01"],
+        ["Kerstvakantie", "2026-12-21", "2027-01-03"],
+        ["Krokusvakantie", "2027-02-22", "2027-03-07"],
+        ["Lentevakantie", "2027-04-26", "2027-05-09"],
+        ["Zomervakantie", "2027-07-03", "2027-08-22"],
+      ],
+      duitstalig: [
+        ["Herfstvakantie", "2026-11-02", "2026-11-08"],
+        ["Kerstvakantie", "2026-12-21", "2027-01-03"],
+        ["Krokusvakantie", "2027-02-08", "2027-02-14"],
+        ["Paasvakantie", "2027-03-29", "2027-04-11"],
+        ["Zomervakantie", "2027-07-01", "2027-08-31"],
+      ],
+    },
+    NL: {
+      noord: [
+        ["Herfstvakantie", "2026-10-10", "2026-10-18"],
+        ["Kerstvakantie", "2026-12-19", "2027-01-03"],
+        ["Voorjaarsvakantie", "2027-02-20", "2027-02-28"],
+        ["Meivakantie", "2027-04-24", "2027-05-02"],
+        ["Zomervakantie", "2027-07-10", "2027-08-22"],
+      ],
+      midden: [
+        ["Herfstvakantie", "2026-10-17", "2026-10-25"],
+        ["Kerstvakantie", "2026-12-19", "2027-01-03"],
+        ["Voorjaarsvakantie", "2027-02-20", "2027-02-28"],
+        ["Meivakantie", "2027-04-24", "2027-05-02"],
+        ["Zomervakantie", "2027-07-17", "2027-08-29"],
+      ],
+      zuid: [
+        ["Herfstvakantie", "2026-10-17", "2026-10-25"],
+        ["Kerstvakantie", "2026-12-19", "2027-01-03"],
+        ["Voorjaarsvakantie", "2027-02-13", "2027-02-21"],
+        ["Meivakantie", "2027-04-24", "2027-05-02"],
+        ["Zomervakantie", "2027-07-24", "2027-09-05"],
+      ],
+    },
+  };
+  if (schoolHolidaysEnabled) {
+    const schoolBreaks = schoolYear2026[country]?.[region] || [];
+    for (const [title, startDate, endDate] of schoolBreaks) {
+      addRange(title, startDate, endDate);
+    }
+  }
+  return entries;
+}
+
+function getHolidayPreferences(user) {
+  const metadata = user?.user_metadata || {};
+  const country = ["BE", "NL"].includes(metadata.country)
+    ? metadata.country
+    : navigator.language.toLowerCase().includes("nl-nl")
+      ? "NL"
+      : "BE";
+  const validRegions =
+    country === "NL"
+      ? ["noord", "midden", "zuid"]
+      : ["vlaanderen", "wallonie", "duitstalig"];
+  return {
+    country,
+    region: validRegions.includes(metadata.region)
+      ? metadata.region
+      : country === "NL"
+        ? "midden"
+        : "vlaanderen",
+    schoolHolidaysEnabled: metadata.school_holidays_enabled !== false,
+  };
+}
+
+function getAppLocale() {
+  return {
+    nl: "nl-BE",
+    en: "en-GB",
+    fr: "fr-FR",
+    de: "de-DE",
+  }[window.agendaI18n?.getLanguage() || "nl"];
+}
+
+function applyUserLanguage(user) {
+  const language = user?.user_metadata?.language;
+  if (["nl", "en", "fr", "de"].includes(language)) {
+    window.agendaI18n.setLanguage(language);
+  }
+}
+
+const holidayRegionOptions = {
+  BE: [
+    ["vlaanderen", "Vlaanderen"],
+    ["wallonie", "Wallonië en Franstalig Brussel"],
+    ["duitstalig", "Duitstalige Gemeenschap"],
+  ],
+  NL: [
+    ["noord", "Noord-Nederland"],
+    ["midden", "Midden-Nederland"],
+    ["zuid", "Zuid-Nederland"],
+  ],
+};
+
 function getWeekStart(date) {
   const weekStart = new Date(
     date.getFullYear(),
@@ -125,11 +321,25 @@ async function initializeProfilePage() {
   const recoveryCodeOutput = document.querySelector(
     "#profiel-herstelcode-uitvoer",
   );
+
   const recoverySection = document.querySelector(
     "#profiel-wachtwoord-herstellen",
   );
   const recoveryForm = document.querySelector("#profiel-herstel-form");
   const recoveryStatus = document.querySelector("#profiel-herstel-status");
+  const countrySelect = document.querySelector("#profiel-land");
+  const regionSelect = document.querySelector("#profiel-regio");
+  const locationForm = document.querySelector("#profiel-locatie-form");
+  const locationStatus = document.querySelector("#profiel-locatie-status");
+  const schoolHolidaysToggle = document.querySelector(
+    "#profiel-schoolvakanties-toggle",
+  );
+  const schoolHolidaysStatus = document.querySelector(
+    "#profiel-schoolvakanties-status",
+  );
+  const languageSelect = document.querySelector("#profiel-taal");
+  const languageForm = document.querySelector("#profiel-taal-form");
+  const languageStatus = document.querySelector("#profiel-taal-status");
 
   if (!accountDetails || !status || !logoutButton) {
     return;
@@ -244,6 +454,46 @@ async function initializeProfilePage() {
     }
 
     let user = data.session.user;
+    if (languageSelect && languageForm && languageStatus) {
+      const savedLanguage = ["nl", "en", "fr", "de"].includes(
+        user.user_metadata?.language,
+      )
+        ? user.user_metadata.language
+        : window.agendaI18n.getLanguage();
+      languageSelect.value = savedLanguage;
+      window.agendaI18n.setLanguage(savedLanguage);
+      languageSelect.addEventListener("change", () => {
+        window.agendaI18n.setLanguage(languageSelect.value);
+      });
+      languageForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const saveButton = languageForm.querySelector('button[type="submit"]');
+        saveButton.disabled = true;
+        languageStatus.textContent = "Taal opslaan...";
+        try {
+          const { data: updatedData, error: updateError } =
+            await client.auth.updateUser({
+              data: {
+                ...user.user_metadata,
+                language: languageSelect.value,
+              },
+            });
+          if (updateError) {
+            throw updateError;
+          }
+          user = updatedData.user;
+          window.agendaI18n.setLanguage(languageSelect.value);
+          languageStatus.textContent = "Taal opgeslagen.";
+        } catch (updateError) {
+          console.error("De taalvoorkeur opslaan is mislukt.", updateError);
+          languageStatus.textContent =
+            `De taalvoorkeur opslaan is mislukt: ${updateError.message}`;
+        } finally {
+          saveButton.disabled = false;
+        }
+      });
+    }
+
     if (recoverySection) {
       recoverySection.hidden = true;
     }
@@ -254,8 +504,101 @@ async function initializeProfilePage() {
     accountDetails.hidden = false;
     status.textContent = "Je accountgegevens.";
 
+    if (countrySelect && regionSelect && locationForm && locationStatus) {
+      const { country, region, schoolHolidaysEnabled } =
+        getHolidayPreferences(user);
+      const updateProfileRegions = (selectedRegion) => {
+        regionSelect.replaceChildren(
+          ...holidayRegionOptions[countrySelect.value].map(
+            ([value, label]) => {
+              const option = document.createElement("option");
+              option.value = value;
+              option.textContent = label;
+              return option;
+            },
+          ),
+        );
+        regionSelect.value = holidayRegionOptions[countrySelect.value].some(
+          ([value]) => value === selectedRegion,
+        )
+          ? selectedRegion
+          : holidayRegionOptions[countrySelect.value][0][0];
+      };
+      countrySelect.value = country;
+      updateProfileRegions(region);
+      countrySelect.addEventListener("change", () => updateProfileRegions(""));
+      locationForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const saveButton = locationForm.querySelector('button[type="submit"]');
+        saveButton.disabled = true;
+        locationStatus.textContent = "Land en regio opslaan...";
+        try {
+          const { data: updatedData, error: updateError } =
+            await client.auth.updateUser({
+              data: {
+                ...user.user_metadata,
+                country: countrySelect.value,
+                region: regionSelect.value,
+              },
+            });
+          if (updateError) {
+            throw updateError;
+          }
+          user = updatedData.user;
+          locationStatus.textContent =
+            "Land en regio opgeslagen. De agenda gebruikt deze keuze voor de feestdagen.";
+        } catch (updateError) {
+          console.error("Land en regio opslaan is mislukt.", updateError);
+          locationStatus.textContent =
+            `Land en regio opslaan is mislukt: ${updateError.message}`;
+        } finally {
+          saveButton.disabled = false;
+        }
+      });
+
+      if (schoolHolidaysToggle && schoolHolidaysStatus) {
+        let isSchoolHolidaysEnabled = schoolHolidaysEnabled;
+        const updateToggleLabel = () => {
+          schoolHolidaysToggle.textContent = isSchoolHolidaysEnabled
+            ? "Schoolvakanties uitschakelen"
+            : "Schoolvakanties inschakelen";
+        };
+        updateToggleLabel();
+        schoolHolidaysToggle.addEventListener("click", async () => {
+          const nextEnabled = !isSchoolHolidaysEnabled;
+          schoolHolidaysToggle.disabled = true;
+          schoolHolidaysStatus.textContent = "Instellingen opslaan...";
+          try {
+            const { data: updatedData, error: updateError } =
+              await client.auth.updateUser({
+                data: {
+                  ...user.user_metadata,
+                  school_holidays_enabled: nextEnabled,
+                },
+              });
+            if (updateError) {
+              throw updateError;
+            }
+            user = updatedData.user;
+            isSchoolHolidaysEnabled = nextEnabled;
+            updateToggleLabel();
+            schoolHolidaysStatus.textContent = nextEnabled
+              ? "Schoolvakanties ingeschakeld."
+              : "Schoolvakanties uitgeschakeld.";
+          } catch (updateError) {
+            console.error("Schoolvakanties wijzigen is mislukt.", updateError);
+            schoolHolidaysStatus.textContent =
+              `Schoolvakanties wijzigen is mislukt: ${updateError.message}`;
+          } finally {
+            schoolHolidaysToggle.disabled = false;
+          }
+        });
+      }
+    }
+
     if (exportButton && exportStatus) {
       let agendaItems = [];
+      let agendaHolidayEntries = [];
       let supportsRepeatDays = true;
       let supportsRepeatStartDate = true;
       exportButton.disabled = true;
@@ -302,23 +645,61 @@ async function initializeProfilePage() {
           throw result.error;
         }
         agendaItems = result.data || [];
-        exportButton.disabled = agendaItems.length === 0;
-        exportStatus.textContent = agendaItems.length
-          ? `${agendaItems.length} afspraken klaar om te exporteren.${supportsRepeatDays ? "" : " Meerdaagse herhaling vereist de SQL voor repeat_days."}${supportsRepeatStartDate ? "" : " Maand- en jaarherhaling vereist de SQL voor repeat_start_date."}`
-          : "Je hebt nog geen afspraken om te exporteren.";
+        const { country, region, schoolHolidaysEnabled } =
+          getHolidayPreferences(user);
+        const currentYear = new Date().getFullYear();
+        agendaHolidayEntries = getHolidayEntries(
+          country,
+          region,
+          [currentYear, currentYear + 1],
+          { schoolHolidaysEnabled },
+        );
+        exportButton.disabled =
+          agendaItems.length + agendaHolidayEntries.length === 0;
+        exportStatus.textContent =
+          agendaItems.length || agendaHolidayEntries.length
+            ? `${agendaItems.length} afspraken en ${agendaHolidayEntries.length} feestdagen klaar om te exporteren.${supportsRepeatDays ? "" : " Meerdaagse herhaling vereist de SQL voor repeat_days."}${supportsRepeatStartDate ? "" : " Maand- en jaarherhaling vereist de SQL voor repeat_start_date."}`
+            : "Je hebt nog geen afspraken of feestdagen om te exporteren.";
       } catch (error) {
         console.error("Agenda laden voor exporteren is niet gelukt.", error);
         exportStatus.textContent = `Je agenda kon niet worden klaargezet voor export: ${error.message}`;
       }
 
       exportButton.addEventListener("click", () => {
-        if (!agendaItems.length) {
-          exportStatus.textContent = "Er zijn geen afspraken om te exporteren.";
+        if (!agendaItems.length && !agendaHolidayEntries.length) {
+          exportStatus.textContent =
+            "Er zijn geen afspraken of feestdagen om te exporteren.";
           return;
         }
 
         const exportWeekStart = getWeekStart(new Date());
-        const events = agendaItems.map((entry) => {
+        const exportEntries = [
+          ...agendaItems,
+          ...agendaHolidayEntries,
+        ];
+        const events = exportEntries.map((entry) => {
+          const escapeText = (value) =>
+            String(value)
+              .replace(/\\/g, "\\\\")
+              .replace(/\n/g, "\\n")
+              .replace(/,/g, "\\,")
+              .replace(/;/g, "\\;");
+          if (entry.isHoliday) {
+            const endExclusive = new Date(
+              `${entry.holidayEndDate}T12:00:00`,
+            );
+            endExclusive.setDate(endExclusive.getDate() + 1);
+            return [
+              "BEGIN:VEVENT",
+              `UID:${entry.id}@agenda`,
+              `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "")}`,
+              `DTSTART;VALUE=DATE:${entry.holidayStartDate.replace(/-/g, "")}`,
+              `DTEND;VALUE=DATE:${formatLocalDate(endExclusive).replace(/-/g, "")}`,
+              `SUMMARY:${escapeText(entry.title)}`,
+              "END:VEVENT",
+            ].join("\r\n");
+          }
+
           const eventDate = entry.week_start
             ? new Date(`${entry.week_start}T12:00:00`)
             : ["monthly", "yearly"].includes(entry.repeat_pattern) &&
@@ -347,12 +728,6 @@ async function initializeProfilePage() {
             date.setMinutes(date.getMinutes() + minutes);
             return `${formatLocalDate(date).replace(/-/g, "")}T${String(date.getHours()).padStart(2, "0")}${String(date.getMinutes()).padStart(2, "0")}00`;
           };
-          const escapeText = (value) =>
-            String(value)
-              .replace(/\\/g, "\\\\")
-              .replace(/\n/g, "\\n")
-              .replace(/,/g, "\\,")
-              .replace(/;/g, "\\;");
           const lines = [
             "BEGIN:VEVENT",
             `UID:${entry.id}@agenda`,
@@ -935,6 +1310,7 @@ async function initializeTodoPage() {
 
     function updateSignedInState(signedInUser) {
       user = signedInUser;
+      applyUserLanguage(user);
       loginPrompt.hidden = Boolean(user);
       form.hidden = !user || !formOpen;
       todoPanel.hidden = !user;
@@ -1209,6 +1585,7 @@ async function initializeNotesPage() {
 
     function updateSignedInState(signedInUser) {
       user = signedInUser;
+      applyUserLanguage(user);
       loginPrompt.hidden = Boolean(user);
       newNoteButton.hidden = !user;
       editor.hidden = true;
@@ -1514,6 +1891,7 @@ async function initializeLinksPage() {
 
     function updateSignedInState(signedInUser) {
       user = signedInUser;
+      applyUserLanguage(user);
       loginPrompt.hidden = Boolean(user);
       newLinkButton.hidden = !user;
       linksList.hidden = !user;
@@ -1933,16 +2311,18 @@ if (
     function updateWeekDates() {
       const endDate = new Date(displayedWeekStart);
       endDate.setDate(endDate.getDate() + 6);
-      const dateFormatter = new Intl.DateTimeFormat("nl-BE", {
+      const dateFormatter = new Intl.DateTimeFormat(getAppLocale(), {
         day: "numeric",
         month: "long",
+      });
+      const weekdayFormatter = new Intl.DateTimeFormat(getAppLocale(), {
+        weekday: "long",
       });
       weekLabel.textContent = `${dateFormatter.format(displayedWeekStart)} – ${dateFormatter.format(endDate)}`;
       dayPanels.forEach((panel, day) => {
         const heading = panel.querySelector(".agenda-day-heading");
         const dayDate = dateFormatter.format(getDateForDay(day));
-        heading.textContent =
-          `${day.charAt(0).toLocaleUpperCase("nl") + day.slice(1)} ${dayDate}`;
+        heading.textContent = `${weekdayFormatter.format(getDateForDay(day))} ${dayDate}`;
       });
     }
 
@@ -1961,6 +2341,14 @@ if (
     }
 
     function itemOccursOnDate(entry, date) {
+      if (entry.isHoliday) {
+        const dateKey = formatLocalDate(date);
+        return (
+          dateKey >= entry.holidayStartDate &&
+          dateKey <= entry.holidayEndDate
+        );
+      }
+
       const dayName = weekdayNames[date.getDay()];
       const repeatPattern = entry.weekStart
         ? "once"
@@ -2035,7 +2423,14 @@ if (
       monthEntries = entries;
       const filteredEntries = entries.filter(matchesCalendarFilters);
       monthOverview.replaceChildren();
-      const shortWeekdays = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
+      const referenceMonday = new Date(2024, 0, 1, 12);
+      const shortWeekdays = Array.from({ length: 7 }, (_, index) => {
+        const day = new Date(referenceMonday);
+        day.setDate(day.getDate() + index);
+        return new Intl.DateTimeFormat(getAppLocale(), {
+          weekday: "short",
+        }).format(day);
+      });
       shortWeekdays.forEach((weekday) => {
         const label = document.createElement("span");
         label.className = "agenda-month-weekday";
@@ -2046,7 +2441,7 @@ if (
 
       const year = displayedMonthStart.getFullYear();
       const month = displayedMonthStart.getMonth();
-      monthLabel.textContent = new Intl.DateTimeFormat("nl-BE", {
+      monthLabel.textContent = new Intl.DateTimeFormat(getAppLocale(), {
         month: "long",
         year: "numeric",
       }).format(displayedMonthStart);
@@ -2055,13 +2450,13 @@ if (
       const dayCount = new Date(year, month + 1, 0).getDate();
       const cellCount = Math.ceil((leadingDays + dayCount) / 7) * 7;
       const today = formatLocalDate(new Date());
-      const dateLabel = new Intl.DateTimeFormat("nl-BE", {
+      const dateLabel = new Intl.DateTimeFormat(getAppLocale(), {
         weekday: "long",
         day: "numeric",
         month: "long",
         year: "numeric",
       });
-      const monthStartLabel = new Intl.DateTimeFormat("nl-BE", {
+      const monthStartLabel = new Intl.DateTimeFormat(getAppLocale(), {
         month: "long",
         year: "numeric",
       }).format(displayedMonthStart);
@@ -2069,6 +2464,7 @@ if (
       for (let index = 0; index < cellCount; index += 1) {
         const date = new Date(year, month, index - leadingDays + 1);
         const dateKey = formatLocalDate(date);
+        const dayName = weekdayNames[date.getDay()];
         const dayItems = filteredEntries
           .filter((entry) => {
             return itemOccursOnDate(entry, date);
@@ -2097,9 +2493,10 @@ if (
         dayItems.slice(0, 2).forEach((entry) => {
           const eventLabel = document.createElement("span");
           eventLabel.className = "agenda-month-event";
-          const startText =
-            entry.startText ||
-            (entry.time ? formatTime(entry.time.start) : "");
+          const startText = entry.isHoliday
+            ? "Hele dag"
+            : entry.startText ||
+              (entry.time ? formatTime(entry.time.start) : "");
           eventLabel.textContent = [
             startText,
             entry.category ? `[${entry.category}]` : "",
@@ -2142,6 +2539,12 @@ if (
       );
       monthOverview.setAttribute("aria-busy", "false");
     }
+
+    document.addEventListener("agenda-language-change", () => {
+      updateWeekDates();
+      renderMonthOverview();
+      rerenderCurrentWeek();
+    });
 
     function setCalendarView(showMonth, updateUrl = true) {
       isMonthView = showMonth;
@@ -2688,7 +3091,8 @@ if (
       style.textContent = `
         .agenda-account { margin: 0 0 16px; padding: 16px; border: 1px solid #d6deea; border-radius: 8px; background: #fff; }
         .agenda-account form, .agenda-item-form { display: grid; gap: 10px; }
-        .agenda-account input, .agenda-item-form input, .agenda-item-form select, .agenda-account button, .agenda-item-form button { min-height: 40px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; }
+        .agenda-account input, .agenda-account select, .agenda-item-form input, .agenda-item-form select, .agenda-account button, .agenda-item-form button { min-height: 40px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; }
+        .agenda-signup-location[hidden] { display: none; }
         .agenda-account button, .agenda-item-form button { cursor: pointer; background: #183153; color: #fff; border-color: #183153; }
         .agenda-account button[type="button"], .agenda-item-form button[type="button"] { background: #fff; color: #183153; }
         .agenda-account-actions, .agenda-item-actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -2710,6 +3114,7 @@ if (
         .agenda-item-actions button { padding: 5px 9px; border: 1px solid #cbd5e1; border-radius: 5px; background: #fff; color: #183153; cursor: pointer; font: inherit; }
         .agenda-item-actions[hidden] { display: none; }
         .agenda-item { cursor: pointer; }
+        .agenda-item.agenda-holiday { border-left-color: #d8872f; background: #fff0df; cursor: default; }
         .agenda-item:focus-visible { outline: 3px solid #3978c5; outline-offset: 3px; }
         .agenda-add-button { position: fixed; right: 24px; bottom: 24px; z-index: 20; display: grid; width: 58px; height: 58px; place-items: center; border: 0; border-radius: 50%; background: #183153; color: white; box-shadow: 0 4px 14px rgb(24 49 83 / 28%); cursor: pointer; font: inherit; font-size: 32px; line-height: 1; }
         .agenda-add-button[hidden] { display: none; }
@@ -2742,6 +3147,10 @@ if (
       const heading = document.createElement("h2");
       heading.textContent = "Mijn agenda";
       heading.style.margin = "0 0 12px";
+      const holidayNotice = document.createElement("p");
+      holidayNotice.className = "agenda-account-message";
+      holidayNotice.textContent =
+        "Nationale feestdagen worden automatisch berekend. Schoolvakanties zijn opgenomen voor schooljaar 2026-2027.";
 
       const signedOutView = document.createElement("div");
       const intro = document.createElement("p");
@@ -2755,6 +3164,17 @@ if (
         <label class="agenda-form-field">Wachtwoord
           <input name="password" type="password" autocomplete="current-password" minlength="6" required>
         </label>
+        <div class="agenda-form-grid agenda-signup-location" hidden>
+          <label class="agenda-form-field">Land
+            <select name="country">
+              <option value="BE">België</option>
+              <option value="NL">Nederland</option>
+            </select>
+          </label>
+          <label class="agenda-form-field">Regio voor schoolvakanties
+            <select name="region" required></select>
+          </label>
+        </div>
         <div class="agenda-account-actions">
           <button type="submit" value="login">Inloggen</button>
           <button type="submit" value="signup">Account aanmaken</button>
@@ -2777,6 +3197,35 @@ if (
         <button type="submit">Wachtwoord opslaan</button>
       `;
 
+      const signupLocation = authForm.querySelector(".agenda-signup-location");
+      const countrySelect = authForm.elements.namedItem("country");
+      const regionSelect = authForm.elements.namedItem("region");
+      const updateRegionOptions = () => {
+        regionSelect.replaceChildren(
+          ...holidayRegionOptions[countrySelect.value].map(([value, label]) => {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = label;
+            return option;
+          }),
+        );
+      };
+      countrySelect.addEventListener("change", updateRegionOptions);
+      updateRegionOptions();
+
+      authForm
+        .querySelector('button[value="signup"]')
+        .addEventListener("click", () => {
+          signupLocation.hidden = false;
+          regionSelect.required = true;
+        });
+      authForm
+        .querySelector('button[value="login"]')
+        .addEventListener("click", () => {
+          signupLocation.hidden = true;
+          regionSelect.required = false;
+        });
+
       const signedInView = document.createElement("div");
       signedInView.hidden = true;
       const signedInLabel = document.createElement("p");
@@ -2791,6 +3240,7 @@ if (
       accountMessage.setAttribute("aria-live", "polite");
       accountPanel.append(
         heading,
+        holidayNotice,
         signedOutView,
         recoveryForm,
         signedInView,
@@ -2834,12 +3284,12 @@ if (
           <select name="repeat_pattern">
             <option value="weekly">Elke week op geselecteerde dagen</option>
             <option value="daily">Elke dag</option>
-            <option value="monthly">Elke maand op dezelfde datum</option>
-            <option value="yearly">Elk jaar op dezelfde datum</option>
+            <option value="monthly">Elke maand op dezelfde dag van de maand</option>
+            <option value="yearly">Elk jaar op dezelfde dag en maand</option>
             <option value="once">Alleen deze week</option>
           </select>
         </label>
-        <label class="agenda-form-field agenda-repeat-start-date" hidden>Datum van herhaling
+        <label class="agenda-form-field agenda-repeat-start-date" hidden>Eerste datum van herhaling
           <input name="repeat_start_date" type="date">
         </label>
         <label class="agenda-form-field">Categorie
@@ -2937,9 +3387,12 @@ if (
         addButton,
         accountMessage,
         authForm,
+        countrySelect,
+        holidayNotice,
         itemForm,
         profileLink,
         recoveryForm,
+        regionSelect,
         updateRepeatControls,
         signedInLabel,
         signedInView,
@@ -2975,6 +3428,13 @@ if (
 
       function setSignedIn(user) {
         currentUser = user;
+        applyUserLanguage(user);
+        ui.holidayNotice.textContent =
+          user && !getHolidayPreferences(user).schoolHolidaysEnabled
+            ? "Nationale feestdagen worden automatisch berekend. Schoolvakanties zijn uitgeschakeld."
+            : "Nationale feestdagen worden automatisch berekend. Schoolvakanties zijn opgenomen voor schooljaar 2026-2027.";
+        updateWeekDates();
+        renderMonthOverview(currentItems);
         ui.accountPanel.hidden = false;
         ui.signedOutView.hidden = Boolean(user);
         ui.signedInView.hidden = !user;
@@ -2986,9 +3446,8 @@ if (
         ui.signedInLabel.textContent = user ? `Ingelogd als ${user.email}` : "";
 
         if (!user) {
-          currentItems = [];
           ui.itemForm.hidden = true;
-          dayLists.forEach((dayList) => dayList.replaceChildren());
+          renderUserItems([]);
           dayIndicators.forEach((indicator) => indicator.replaceChildren());
           if (recoveryError) {
             showAccountMessage(
@@ -3025,7 +3484,7 @@ if (
           updateWeekDates();
           renderUserItems(records);
         };
-        currentItems = records.map((record, rowNumber) => {
+        const userItems = records.map((record, rowNumber) => {
           const startText = String(record.start_time).slice(0, 5);
           const endText = record.end_time
             ? String(record.end_time).slice(0, 5)
@@ -3049,6 +3508,20 @@ if (
             startText,
           };
         });
+        const { country, region, schoolHolidaysEnabled } =
+          getHolidayPreferences(currentUser);
+        currentItems = [
+          ...userItems,
+          ...getHolidayEntries(
+            country,
+            region,
+            [
+              displayedWeekStart.getFullYear(),
+              displayedMonthStart.getFullYear(),
+            ],
+            { schoolHolidaysEnabled },
+          ),
+        ];
         updateCategoryOptions(currentItems);
         renderMonthOverview(currentItems);
         let visibleCount = 0;
@@ -3085,7 +3558,9 @@ if (
             text.textContent = `${entry.startText} - ${formatTime(end)}: `;
             const title = document.createElement("span");
             title.className = "agenda-item-title";
-            title.textContent = entry.title;
+            title.textContent = entry.isHoliday
+              ? window.agendaI18n.translate(entry.title)
+              : entry.title;
             item.append(text, title);
             if (entry.category) {
               const badge = document.createElement("span");
@@ -3095,6 +3570,19 @@ if (
             }
             if (entry.color && !applyColor(item, entry.color)) {
               console.warn(`Ongeldige kleur in de agenda: ${entry.color}`);
+            }
+
+            if (entry.isHoliday) {
+              item.classList.add("agenda-holiday");
+              item.tabIndex = -1;
+              item.setAttribute(
+                "aria-label",
+                `${window.agendaI18n.translate(entry.title)}, ${window.agendaI18n
+                  .translate("Hele dag")
+                  .toLowerCase()}`,
+              );
+              dayList.append(item);
+              return;
             }
 
             const actions = document.createElement("div");
@@ -3354,7 +3842,16 @@ if (
         try {
           result =
             submitter.value === "signup"
-              ? await client.auth.signUp(credentials)
+              ? await client.auth.signUp({
+                  ...credentials,
+                  options: {
+                    data: {
+                      country: ui.countrySelect.value,
+                      region: ui.regionSelect.value,
+                      language: window.agendaI18n.getLanguage(),
+                    },
+                  },
+                })
               : await client.auth.signInWithPassword(credentials);
         } catch (error) {
           submitter.disabled = false;
@@ -3629,6 +4126,9 @@ if (
         const activeItems = [];
         if (isCurrentWeek && day === currentDay) {
           items.forEach((item) => {
+            if (item.classList.contains("agenda-holiday")) {
+              return;
+            }
             const start = Number(item.dataset.start);
             let end = Number(item.dataset.end);
             if (!Number.isFinite(start) || !Number.isFinite(end)) {

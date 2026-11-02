@@ -1,4 +1,4 @@
-const CACHE_NAME = "agenda-v2";
+const CACHE_NAME = "agenda-v6";
 const APP_FILES = [
   "./",
   "./index.html",
@@ -13,6 +13,7 @@ const APP_FILES = [
   "./links.html",
   "./profiel.html",
   "./index.js",
+  "./i18n.js",
   "./pwa.js",
   "./manifest.webmanifest",
   "./favicon.svg",
