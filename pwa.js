@@ -14,6 +14,12 @@ function updateDateFavicon() {
   favicon.type = "image/svg+xml";
   favicon.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
 
+  if (typeof navigator.setAppBadge === "function") {
+    navigator.setAppBadge(day).catch((error) => {
+      console.error("De datum-badge van de app kon niet worden bijgewerkt.", error);
+    });
+  }
+
   const nextMidnight = new Date(now);
   nextMidnight.setHours(24, 0, 0, 250);
   window.clearTimeout(updateDateFavicon.timer);
