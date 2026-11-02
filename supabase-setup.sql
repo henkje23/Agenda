@@ -8,6 +8,7 @@ alter table if exists public.agenda_items
   add column if not exists week_start date,
   add column if not exists repeat_pattern text not null default 'weekly',
   add column if not exists repeat_days text[],
+  add column if not exists repeat_start_date date,
   add column if not exists category text;
 
 create table if not exists public.notes (

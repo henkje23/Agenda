@@ -257,28 +257,46 @@ async function initializeProfilePage() {
     if (exportButton && exportStatus) {
       let agendaItems = [];
       let supportsRepeatDays = true;
+      let supportsRepeatStartDate = true;
       exportButton.disabled = true;
       exportStatus.textContent = "Je agenda laden voor export...";
       try {
-        let result = await client
-          .from("agenda_items")
-          .select(
-            "id, day, start_time, end_time, title, week_start, repeat_pattern, repeat_days",
-          )
-          .eq("user_id", user.id)
-          .order("start_time", { ascending: true });
-        if (
-          result.error?.code === "42703" &&
-          String(result.error.message).includes("repeat_days")
-        ) {
-          supportsRepeatDays = false;
+        let result;
+        while (true) {
+          const columns = [
+            "id",
+            "day",
+            "start_time",
+            "end_time",
+            "title",
+            "week_start",
+            "repeat_pattern",
+          ];
+          if (supportsRepeatDays) {
+            columns.push("repeat_days");
+          }
+          if (supportsRepeatStartDate) {
+            columns.push("repeat_start_date");
+          }
           result = await client
             .from("agenda_items")
-            .select(
-              "id, day, start_time, end_time, title, week_start, repeat_pattern",
-            )
+            .select(columns.join(", "))
             .eq("user_id", user.id)
             .order("start_time", { ascending: true });
+          if (!["42703", "PGRST204"].includes(String(result.error?.code))) {
+            break;
+          }
+          const errorMessage = String(result.error.message);
+          if (errorMessage.includes("repeat_days") && supportsRepeatDays) {
+            supportsRepeatDays = false;
+          } else if (
+            errorMessage.includes("repeat_start_date") &&
+            supportsRepeatStartDate
+          ) {
+            supportsRepeatStartDate = false;
+          } else {
+            break;
+          }
         }
         if (result.error) {
           throw result.error;
@@ -286,7 +304,7 @@ async function initializeProfilePage() {
         agendaItems = result.data || [];
         exportButton.disabled = agendaItems.length === 0;
         exportStatus.textContent = agendaItems.length
-          ? `${agendaItems.length} afspraken klaar om te exporteren.${supportsRepeatDays ? "" : " Meerdaagse herhaling vereist de SQL voor repeat_days."}`
+          ? `${agendaItems.length} afspraken klaar om te exporteren.${supportsRepeatDays ? "" : " Meerdaagse herhaling vereist de SQL voor repeat_days."}${supportsRepeatStartDate ? "" : " Maand- en jaarherhaling vereist de SQL voor repeat_start_date."}`
           : "Je hebt nog geen afspraken om te exporteren.";
       } catch (error) {
         console.error("Agenda laden voor exporteren is niet gelukt.", error);
@@ -303,10 +321,13 @@ async function initializeProfilePage() {
         const events = agendaItems.map((entry) => {
           const eventDate = entry.week_start
             ? new Date(`${entry.week_start}T12:00:00`)
-            : entry.repeat_pattern === "daily"
-              ? new Date()
-              : new Date(exportWeekStart);
-          if (entry.week_start || entry.repeat_pattern !== "daily") {
+            : ["monthly", "yearly"].includes(entry.repeat_pattern) &&
+                entry.repeat_start_date
+              ? new Date(`${entry.repeat_start_date}T12:00:00`)
+              : entry.repeat_pattern === "daily"
+                ? new Date()
+                : new Date(exportWeekStart);
+          if (entry.week_start || entry.repeat_pattern === "weekly") {
             const weekdayOffset =
               (weekdayNames.indexOf(entry.day) + 6) % 7;
             eventDate.setDate(eventDate.getDate() + weekdayOffset);
@@ -343,6 +364,22 @@ async function initializeProfilePage() {
 
           if (!entry.week_start && entry.repeat_pattern === "daily") {
             lines.push("RRULE:FREQ=DAILY");
+          } else if (
+            !entry.week_start &&
+            entry.repeat_pattern === "monthly" &&
+            entry.repeat_start_date
+          ) {
+            lines.push(
+              `RRULE:FREQ=MONTHLY;BYMONTHDAY=${Number(entry.repeat_start_date.slice(8, 10))}`,
+            );
+          } else if (
+            !entry.week_start &&
+            entry.repeat_pattern === "yearly" &&
+            entry.repeat_start_date
+          ) {
+            const month = Number(entry.repeat_start_date.slice(5, 7));
+            const day = Number(entry.repeat_start_date.slice(8, 10));
+            lines.push(`RRULE:FREQ=YEARLY;BYMONTH=${month};BYMONTHDAY=${day}`);
           } else if (!entry.week_start) {
             const dayCodes = {
               zondag: "SU",
@@ -1636,6 +1673,7 @@ if (
     const selectedDay = { value: weekdayNames[currentPageWeekday] };
     const calendarFilters = { search: "", category: "" };
     let supportsRepeatDays = true;
+    let supportsRepeatStartDate = true;
     let supportsCategories = true;
     const requestedMonth = /^(\d{4})-(\d{2})$/.exec(
       new URLSearchParams(window.location.search).get("maand") || "",
@@ -1922,6 +1960,44 @@ if (
       );
     }
 
+    function itemOccursOnDate(entry, date) {
+      const dayName = weekdayNames[date.getDay()];
+      const repeatPattern = entry.weekStart
+        ? "once"
+        : entry.repeatPattern || "weekly";
+      if (
+        entry.weekStart &&
+        entry.weekStart !== formatLocalDate(getWeekStart(date))
+      ) {
+        return false;
+      }
+
+      if (repeatPattern === "daily") {
+        return true;
+      }
+      if (repeatPattern === "weekly") {
+        const repeatDays =
+          Array.isArray(entry.repeatDays) && entry.repeatDays.length
+            ? entry.repeatDays
+            : [entry.day];
+        return repeatDays.includes(dayName);
+      }
+      if (repeatPattern === "monthly" || repeatPattern === "yearly") {
+        if (!entry.repeatStartDate) {
+          return false;
+        }
+        const startDate = new Date(`${entry.repeatStartDate}T12:00:00`);
+        if (formatLocalDate(date) < entry.repeatStartDate) {
+          return false;
+        }
+        return repeatPattern === "monthly"
+          ? date.getDate() === startDate.getDate()
+          : date.getMonth() === startDate.getMonth() &&
+              date.getDate() === startDate.getDate();
+      }
+      return entry.day === dayName;
+    }
+
     function updateCategoryOptions(entries) {
       const previousValue = categoryFilter.value;
       const categories = [
@@ -1993,28 +2069,9 @@ if (
       for (let index = 0; index < cellCount; index += 1) {
         const date = new Date(year, month, index - leadingDays + 1);
         const dateKey = formatLocalDate(date);
-        const dayName = weekdayNames[date.getDay()];
-        const weekStart = formatLocalDate(getWeekStart(date));
         const dayItems = filteredEntries
           .filter((entry) => {
-            const repeatPattern = entry.repeatPattern || "weekly";
-            if (
-              entry.weekStart &&
-              entry.weekStart !== weekStart
-            ) {
-              return false;
-            }
-            if (repeatPattern === "daily") {
-              return true;
-            }
-            if (repeatPattern === "weekly") {
-              const repeatDays =
-                Array.isArray(entry.repeatDays) && entry.repeatDays.length
-                  ? entry.repeatDays
-                  : [entry.day];
-              return repeatDays.includes(dayName);
-            }
-            return entry.day === dayName;
+            return itemOccursOnDate(entry, date);
           })
           .sort(
             (first, second) =>
@@ -2522,9 +2579,7 @@ if (
           .filter(
             (entry) =>
               matchesCalendarFilters(entry) &&
-              entry.day === day &&
-              (!entry.weekStart ||
-                entry.weekStart === formatLocalDate(displayedWeekStart)),
+              itemOccursOnDate(entry, getDateForDay(day)),
           )
           .sort(
           (first, second) =>
@@ -2561,8 +2616,9 @@ if (
       const totalEntries = entries.filter(
         (entry) =>
           matchesCalendarFilters(entry) &&
-          (!entry.weekStart ||
-            entry.weekStart === formatLocalDate(displayedWeekStart)),
+          orderedWeekdays.some((day) =>
+            itemOccursOnDate(entry, getDateForDay(day)),
+          ),
       ).length;
       status.textContent = totalEntries
         ? `Planning geladen voor de hele week (${totalEntries} afspraken)${calendarFilters.search || calendarFilters.category ? " (gefilterd)" : ""}${skippedMessage}`
@@ -2643,6 +2699,7 @@ if (
         .agenda-repeat-field input { width: 18px; min-height: 18px; height: 18px; margin: 0; accent-color: #183153; }
         .agenda-repeat-days { display: grid; gap: 8px; margin: 0; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; }
         .agenda-repeat-days[hidden], .agenda-once-day[hidden] { display: none; }
+        .agenda-repeat-start-date[hidden] { display: none; }
         .agenda-repeat-days legend { padding: 0 4px; font-size: 14px; font-weight: 600; }
         .agenda-repeat-days-options { display: flex; flex-wrap: wrap; gap: 8px 14px; }
         .agenda-repeat-day { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; }
@@ -2777,8 +2834,13 @@ if (
           <select name="repeat_pattern">
             <option value="weekly">Elke week op geselecteerde dagen</option>
             <option value="daily">Elke dag</option>
+            <option value="monthly">Elke maand op dezelfde datum</option>
+            <option value="yearly">Elk jaar op dezelfde datum</option>
             <option value="once">Alleen deze week</option>
           </select>
+        </label>
+        <label class="agenda-form-field agenda-repeat-start-date" hidden>Datum van herhaling
+          <input name="repeat_start_date" type="date">
         </label>
         <label class="agenda-form-field">Categorie
           <select name="category">
@@ -2824,12 +2886,28 @@ if (
       const repeatPatternSelect = itemForm.elements.namedItem("repeat_pattern");
       const onceDayField = itemForm.querySelector(".agenda-once-day");
       const repeatDaysField = itemForm.querySelector(".agenda-repeat-days");
+      const repeatStartDateField = itemForm.querySelector(
+        ".agenda-repeat-start-date",
+      );
+      const repeatStartDateInput = itemForm.elements.namedItem(
+        "repeat_start_date",
+      );
       const updateRepeatControls = () => {
         const isOnce = repeatPatternSelect.value === "once";
         const isWeekly = repeatPatternSelect.value === "weekly";
+        const isDateBased = ["monthly", "yearly"].includes(
+          repeatPatternSelect.value,
+        );
         onceDayField.hidden = !isOnce;
         daySelect.required = isOnce;
         repeatDaysField.hidden = !isWeekly;
+        repeatStartDateField.hidden = !isDateBased;
+        repeatStartDateInput.required = isDateBased;
+        if (isDateBased && !repeatStartDateInput.value) {
+          repeatStartDateInput.value = formatLocalDate(
+            getDateForDay(daySelect.value),
+          );
+        }
       };
       repeatPatternSelect.addEventListener("change", updateRepeatControls);
       daySelect.addEventListener("change", () => {
@@ -2931,11 +3009,12 @@ if (
         loadUserItems().catch((error) => {
           console.error("Je agenda kon niet worden geladen.", error);
           showAccountMessage(
-            error.code === "42703" &&
+            ["42703", "PGRST204"].includes(String(error.code)) &&
               (String(error.message).includes("week_start") ||
                 String(error.message).includes("repeat_pattern") ||
-                String(error.message).includes("repeat_days"))
-              ? "De database mist een herhalingskolom. Voer de SQL uit die week_start, repeat_pattern en repeat_days toevoegt."
+                String(error.message).includes("repeat_days") ||
+                String(error.message).includes("repeat_start_date"))
+              ? "De database mist een herhalingskolom. Voer de SQL uit supabase-setup.sql uit."
               : `Je agenda kon niet worden geladen: ${error.message}`,
           );
         });
@@ -2959,6 +3038,7 @@ if (
             time: parseTime(startText),
             endTime: endText ? (parseTime(endText)?.start ?? null) : null,
             weekStart: record.week_start,
+            repeatStartDate: record.repeat_start_date,
             repeatPattern: record.repeat_pattern || "weekly",
             repeatDays:
               Array.isArray(record.repeat_days) && record.repeat_days.length
@@ -2977,12 +3057,7 @@ if (
             .filter(
               (entry) =>
                 matchesCalendarFilters(entry) &&
-                (entry.repeatPattern === "daily" ||
-                  (entry.repeatPattern === "weekly"
-                    ? entry.repeatDays.includes(day)
-                    : entry.day === day)) &&
-                (!entry.weekStart ||
-                  entry.weekStart === formatLocalDate(displayedWeekStart)),
+                itemOccursOnDate(entry, getDateForDay(day)),
             )
             .sort(
               (first, second) =>
@@ -3041,6 +3116,8 @@ if (
                 entry.category;
               ui.itemForm.elements.namedItem("repeat_pattern").value =
                 entry.weekStart ? "once" : entry.repeatPattern;
+              ui.itemForm.elements.namedItem("repeat_start_date").value =
+                entry.repeatStartDate || "";
               ui.itemForm
                 .querySelectorAll('input[name="repeat_days"]')
                 .forEach((checkbox) => {
@@ -3152,6 +3229,9 @@ if (
           !supportsCategories
             ? " Categorieën opslaan vereist de kolom category in Supabase."
             : "",
+          !supportsRepeatStartDate
+            ? " Maand- en jaarherhaling vereist de kolom repeat_start_date in Supabase."
+            : "",
         ].join("");
         const filterNotice =
           (calendarFilters.search || calendarFilters.category) && !visibleCount
@@ -3185,6 +3265,9 @@ if (
           if (supportsRepeatDays) {
             columns.push("repeat_days");
           }
+          if (supportsRepeatStartDate) {
+            columns.push("repeat_start_date");
+          }
           if (supportsCategories) {
             columns.push("category");
           }
@@ -3208,6 +3291,8 @@ if (
             )?.[1];
           if (missingColumn === "repeat_days") {
             supportsRepeatDays = false;
+          } else if (missingColumn === "repeat_start_date") {
+            supportsRepeatStartDate = false;
           } else if (missingColumn === "category") {
             supportsCategories = false;
           } else {
@@ -3226,6 +3311,8 @@ if (
         ui.itemForm.elements.namedItem("id").value = "";
         ui.itemForm.elements.namedItem("day").value = selectedDay.value;
         ui.itemForm.elements.namedItem("repeat_pattern").value = "weekly";
+        ui.itemForm.elements.namedItem("repeat_start_date").value =
+          formatLocalDate(getDateForDay(selectedDay.value));
         ui.itemForm
           .querySelectorAll('input[name="repeat_days"]')
           .forEach((checkbox) => {
@@ -3356,6 +3443,9 @@ if (
         const title = String(formData.get("title")).trim();
         const itemId = String(formData.get("id"));
         const repeatPattern = String(formData.get("repeat_pattern"));
+        const repeatStartDate = String(
+          formData.get("repeat_start_date") || "",
+        );
         const category = String(formData.get("category") || "");
         const repeatDays = formData
           .getAll("repeat_days")
@@ -3371,6 +3461,22 @@ if (
         }
         if (repeatPattern === "weekly" && repeatDays.length === 0) {
           showAccountMessage("Kies minstens één dag voor de herhaling.");
+          return;
+        }
+        if (
+          ["monthly", "yearly"].includes(repeatPattern) &&
+          !repeatStartDate
+        ) {
+          showAccountMessage("Kies de datum waarop de herhaling begint.");
+          return;
+        }
+        if (
+          !supportsRepeatStartDate &&
+          ["monthly", "yearly"].includes(repeatPattern)
+        ) {
+          showAccountMessage(
+            "Maand- en jaarherhaling opslaan kan pas nadat je supabase-setup.sql hebt uitgevoerd.",
+          );
           return;
         }
         if (
@@ -3398,6 +3504,10 @@ if (
           day:
             repeatPattern === "weekly"
               ? repeatDays[0]
+              : ["monthly", "yearly"].includes(repeatPattern)
+                ? weekdayNames[
+                    new Date(`${repeatStartDate}T12:00:00`).getDay()
+                  ]
               : String(formData.get("day") || selectedDay.value),
           start_time: startTime,
           end_time: endTime || null,
@@ -3408,8 +3518,17 @@ if (
               ? formatLocalDate(displayedWeekStart)
               : null,
           repeat_pattern:
-            repeatPattern === "daily" ? "daily" : "weekly",
+            ["daily", "monthly", "yearly"].includes(repeatPattern)
+              ? repeatPattern
+              : "weekly",
         };
+        if (supportsRepeatStartDate) {
+          values.repeat_start_date = ["monthly", "yearly"].includes(
+            repeatPattern,
+          )
+            ? repeatStartDate
+            : null;
+        }
         if (supportsCategories) {
           values.category = category || null;
         }
