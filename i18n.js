@@ -768,6 +768,130 @@
     },
   };
 
+  Object.assign(translations.en, {
+    "Gebruikersprofiel delen": "Share your profile",
+    "Gebruikersprofiel opzoeken": "Find a user profile",
+    "Gebruikersnaam": "Username",
+    "Eenmalige code": "One-time code",
+    "Gebruikersnaam opslaan": "Save username",
+    "Eenmalige kijkcode maken": "Create one-time viewing code",
+    "Agenda bekijken": "View calendar",
+    "Icoontje (emoji)": "Icon (emoji)",
+    "← Vorige week": "← Previous week",
+    "Deze week": "This week",
+    "Volgende week →": "Next week →",
+    "Alleen-lezen toegang tot ": "Read-only access until ",
+    "Agenda van ": "Calendar of ",
+    "Geen afspraken": "No events",
+    "Hele dag": "All day",
+    "Code controleren...": "Checking code...",
+    "Gebruikersnaam opslaan...": "Saving username...",
+    "Eenmalige code maken...": "Creating one-time code...",
+    "Eerdere codes en kijktoegang zijn beëindigd.":
+      "Previous codes and viewing access have been revoked.",
+    "De agenda kon niet worden geopend:": "Could not open the calendar:",
+    "De gedeelde agenda kan niet worden geladen:":
+      "Could not load the shared calendar:",
+    "Gebruikersnaam opslaan is niet gelukt:":
+      "Could not save username:",
+    "Eenmalige code maken is niet gelukt:":
+      "Could not create one-time code:",
+    "Gebruikersnaam of eenmalige code is onjuist, verlopen of al gebruikt.":
+      "The username or one-time code is incorrect, expired, or already used.",
+    "Vraag een nieuwe code aan.": "Request a new code.",
+    "De kijktoegang is verlopen.": "Viewing access has expired.",
+    "Stel een unieke gebruikersnaam in": "Set a unique username",
+    "maak een eenmalige code": "create a one-time code",
+    "De code verloopt na 24 uur": "The code expires after 24 hours",
+    "24 uur alleen kijken": "view-only access for 24 hours",
+    "Een nieuwe code beëindigt eerdere gedeelde toegang.":
+      "Creating a new code revokes previous shared access.",
+    "De agenda is daarna 24 uur alleen-lezen zichtbaar.":
+      "The calendar is then visible in read-only mode for 24 hours.",
+  });
+  Object.assign(translations.fr, {
+    "Gebruikersprofiel delen": "Partager votre profil",
+    "Gebruikersprofiel opzoeken": "Rechercher un profil",
+    "Gebruikersnaam": "Nom d’utilisateur",
+    "Eenmalige code": "Code à usage unique",
+    "Gebruikersnaam opslaan": "Enregistrer le nom d’utilisateur",
+    "Eenmalige kijkcode maken": "Créer un code de consultation unique",
+    "Agenda bekijken": "Voir l’agenda",
+    "Icoontje (emoji)": "Icône (emoji)",
+    "← Vorige week": "← Semaine précédente",
+    "Deze week": "Cette semaine",
+    "Volgende week →": "Semaine suivante →",
+    "Alleen-lezen toegang tot ": "Accès en lecture seule jusqu’au ",
+    "Agenda van ": "Agenda de ",
+    "Geen afspraken": "Aucun rendez-vous",
+    "Hele dag": "Toute la journée",
+    "Code controleren...": "Vérification du code...",
+    "Gebruikersnaam opslaan...": "Enregistrement du nom...",
+    "Eenmalige code maken...": "Création du code...",
+    "Eerdere codes en kijktoegang zijn beëindigd.":
+      "Les anciens codes et accès ont été révoqués.",
+    "De agenda kon niet worden geopend:": "Impossible d’ouvrir l’agenda :",
+    "De gedeelde agenda kan niet worden geladen:":
+      "Impossible de charger l’agenda partagé :",
+    "Gebruikersnaam opslaan is niet gelukt:":
+      "Impossible d’enregistrer le nom d’utilisateur :",
+    "Eenmalige code maken is niet gelukt:":
+      "Impossible de créer le code :",
+    "Gebruikersnaam of eenmalige code is onjuist, verlopen of al gebruikt.":
+      "Le nom d’utilisateur ou le code est incorrect, expiré ou déjà utilisé.",
+    "Vraag een nieuwe code aan.": "Demandez un nouveau code.",
+    "De kijktoegang is verlopen.": "L’accès de consultation a expiré.",
+    "Stel een unieke gebruikersnaam in": "Choisissez un nom d’utilisateur unique",
+    "maak een eenmalige code": "créez un code à usage unique",
+    "De code verloopt na 24 uur": "Le code expire après 24 heures",
+    "24 uur alleen kijken": "consultation seule pendant 24 heures",
+    "Een nieuwe code beëindigt eerdere gedeelde toegang.":
+      "Un nouveau code révoque les anciens accès partagés.",
+    "De agenda is daarna 24 uur alleen-lezen zichtbaar.":
+      "L’agenda est ensuite consultable en lecture seule pendant 24 heures.",
+  });
+  Object.assign(translations.de, {
+    "Gebruikersprofiel delen": "Profil teilen",
+    "Gebruikersprofiel opzoeken": "Profil suchen",
+    "Gebruikersnaam": "Benutzername",
+    "Eenmalige code": "Einmalcode",
+    "Gebruikersnaam opslaan": "Benutzernamen speichern",
+    "Eenmalige kijkcode maken": "Einmaligen Ansichtscode erstellen",
+    "Agenda bekijken": "Kalender ansehen",
+    "Icoontje (emoji)": "Symbol (Emoji)",
+    "← Vorige week": "← Vorherige Woche",
+    "Deze week": "Diese Woche",
+    "Volgende week →": "Nächste Woche →",
+    "Alleen-lezen toegang tot ": "Lesezugriff bis ",
+    "Agenda van ": "Kalender von ",
+    "Geen afspraken": "Keine Termine",
+    "Hele dag": "Ganztägig",
+    "Code controleren...": "Code wird geprüft...",
+    "Gebruikersnaam opslaan...": "Benutzername wird gespeichert...",
+    "Eenmalige code maken...": "Einmalcode wird erstellt...",
+    "Eerdere codes en kijktoegang zijn beëindigd.":
+      "Vorherige Codes und Zugriffe wurden widerrufen.",
+    "De agenda kon niet worden geopend:": "Kalender konnte nicht geöffnet werden:",
+    "De gedeelde agenda kan niet worden geladen:":
+      "Geteilter Kalender konnte nicht geladen werden:",
+    "Gebruikersnaam opslaan is niet gelukt:":
+      "Benutzername konnte nicht gespeichert werden:",
+    "Eenmalige code maken is niet gelukt:":
+      "Einmalcode konnte nicht erstellt werden:",
+    "Gebruikersnaam of eenmalige code is onjuist, verlopen of al gebruikt.":
+      "Benutzername oder Einmalcode ist falsch, abgelaufen oder bereits verwendet.",
+    "Vraag een nieuwe code aan.": "Fordere einen neuen Code an.",
+    "De kijktoegang is verlopen.": "Der Ansichtszeitraum ist abgelaufen.",
+    "Stel een unieke gebruikersnaam in": "Lege einen eindeutigen Benutzernamen fest",
+    "maak een eenmalige code": "erstelle einen Einmalcode",
+    "De code verloopt na 24 uur": "Der Code läuft nach 24 Stunden ab",
+    "24 uur alleen kijken": "24 Stunden nur Lesezugriff",
+    "Een nieuwe code beëindigt eerdere gedeelde toegang.":
+      "Ein neuer Code widerruft vorherige Freigaben.",
+    "De agenda is daarna 24 uur alleen-lezen zichtbaar.":
+      "Der Kalender ist anschließend 24 Stunden schreibgeschützt sichtbar.",
+  });
+
   const supportedLanguages = ["nl", "en", "fr", "de"];
   const getLanguage = () => {
     try {

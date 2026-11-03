@@ -319,6 +319,7 @@ function parseIcalendarEvents(content) {
       const start = currentEvent.dtstart;
       const end = currentEvent.dtend;
       const title = currentEvent.summary?.trim();
+      const description = currentEvent.description || "";
       const uid = currentEvent.uid || "";
       if (currentEvent.status === "CANCELLED" && uid) {
         cancelledUids.add(uid);
@@ -414,6 +415,7 @@ function parseIcalendarEvents(content) {
               start_time: "00:00",
               end_time: "23:59",
               title,
+              description,
               week_start: formatLocalDate(getWeekStart(date)),
               repeat_pattern: "once",
               color: null,
@@ -443,6 +445,7 @@ function parseIcalendarEvents(content) {
               start_time: startTime,
               end_time: endTime,
               title,
+              description,
               week_start: formatLocalDate(getWeekStart(occurrenceStart)),
               repeat_pattern: "once",
               color: null,
@@ -499,6 +502,11 @@ function parseIcalendarEvents(content) {
     } else if (property === "SUMMARY") {
       currentEvent.summary = value.replace(/\\([nN,;\\])/g, (_, escaped) =>
         escaped.toLowerCase() === "n" ? " " : escaped,
+      );
+    } else if (property === "DESCRIPTION") {
+      currentEvent.description = value.replace(
+        /\\([nN,;\\])/g,
+        (_, escaped) => (escaped.toLowerCase() === "n" ? "\n" : escaped),
       );
     } else if (property === "UID") {
       currentEvent.uid = value;
@@ -822,6 +830,31 @@ async function initializeProfilePage() {
   const languageSelect = document.querySelector("#profiel-taal");
   const languageForm = document.querySelector("#profiel-taal-form");
   const languageStatus = document.querySelector("#profiel-taal-status");
+  const usernameForm = document.querySelector("#profiel-gebruikersnaam-form");
+  const usernameInput = document.querySelector("#profiel-gebruikersnaam");
+  const usernameStatus = document.querySelector(
+    "#profiel-gebruikersnaam-status",
+  );
+  const shareCodeButton = document.querySelector("#profiel-deelcode-maken");
+  const shareCodeOutput = document.querySelector("#profiel-deelcode-uitvoer");
+  const shareCodeStatus = document.querySelector("#profiel-deelcode-status");
+  const shareForm = document.querySelector("#agenda-share-form");
+  const shareStatus = document.querySelector("#agenda-share-status");
+  const shareView = document.querySelector("#agenda-share-view");
+  const shareHeading = document.querySelector("#agenda-share-heading");
+  const shareExpiry = document.querySelector("#agenda-share-expiry");
+  const shareWeekLabel = document.querySelector("#agenda-share-week-label");
+  const shareWeek = document.querySelector("#agenda-share-week");
+  const shareWeekButtons = {
+    previous: document.querySelector("#agenda-share-prev"),
+    next: document.querySelector("#agenda-share-next"),
+    today: document.querySelector("#agenda-share-today"),
+  };
+  let shareViewerToken = "";
+  let shareUsername = "";
+  let shareItems = [];
+  let shareWeekStart = getWeekStart(new Date());
+  let shareExpiryTimer = 0;
 
   if (!accountDetails || !status || !logoutButton) {
     return;
@@ -847,6 +880,334 @@ async function initializeProfilePage() {
       supabaseConfig.url,
       supabaseConfig.publishableKey,
     );
+    async function invokeAgendaSharing(body) {
+      const { data: responseData, error: responseError } =
+        await client.functions.invoke("agenda-sharing", { body });
+      if (responseError) {
+        let message = responseError.message;
+        if (responseError.context instanceof Response) {
+          const errorBody = await responseError.context.clone().json().catch(
+            () => null,
+          );
+          if (typeof errorBody?.error === "string") {
+            message = errorBody.error;
+          }
+        }
+        throw new Error(message);
+      }
+      return responseData;
+    }
+
+    function clearAgendaShareSession(message = "") {
+      window.clearTimeout(shareExpiryTimer);
+      shareViewerToken = "";
+      shareItems = [];
+      window.sessionStorage.removeItem("agenda-share-viewer-token");
+      window.sessionStorage.removeItem("agenda-share-viewer-expiry");
+      window.sessionStorage.removeItem("agenda-share-viewer-username");
+      shareView.hidden = true;
+      shareStatus.textContent = message;
+    }
+
+    function renderSharedAgendaWeek() {
+      shareWeek.replaceChildren();
+      const dayLabels = Array.from({ length: 7 }, (_, index) => {
+        const date = new Date(shareWeekStart);
+        date.setDate(date.getDate() + index);
+        return {
+          date,
+          dateKey: formatLocalDate(date),
+          dayName: weekdayNames[date.getDay()],
+        };
+      });
+      shareWeekLabel.textContent = `${new Intl.DateTimeFormat(
+        getAppLocale(),
+        { day: "numeric", month: "long" },
+      ).format(dayLabels[0].date)} – ${new Intl.DateTimeFormat(
+        getAppLocale(),
+        { day: "numeric", month: "long", year: "numeric" },
+      ).format(dayLabels[6].date)}`;
+
+      dayLabels.forEach(({ date, dateKey, dayName }) => {
+        const daySection = document.createElement("section");
+        daySection.className = "agenda-share-day";
+        const heading = document.createElement("h3");
+        heading.textContent = new Intl.DateTimeFormat(getAppLocale(), {
+          weekday: "long",
+          day: "numeric",
+          month: "short",
+        }).format(date);
+        daySection.append(heading);
+
+        const dayItems = shareItems
+          .filter((entry) => {
+            const entryDay = String(entry.day || "").toLowerCase();
+            const weekStart = String(entry.week_start || "").slice(0, 10);
+            const repeatStartDate = String(
+              entry.repeat_start_date || entry.week_start || "",
+            ).slice(0, 10);
+            const repeatStart = repeatStartDate
+              ? new Date(`${repeatStartDate}T12:00:00`)
+              : null;
+            const repeatPattern = weekStart
+              ? "once"
+              : entry.repeat_pattern || "weekly";
+            if (
+              weekStart &&
+              weekStart !== formatLocalDate(getWeekStart(date)) &&
+              weekStart !== dateKey
+            ) {
+              return false;
+            }
+            if (repeatPattern === "once") {
+              return entryDay === dayName;
+            }
+            if (
+              repeatStart &&
+              dateKey < formatLocalDate(repeatStart)
+            ) {
+              return false;
+            }
+            if (repeatPattern === "daily") {
+              return true;
+            }
+            if (repeatPattern === "monthly") {
+              return Boolean(
+                repeatStart && date.getDate() === repeatStart.getDate(),
+              );
+            }
+            if (repeatPattern === "yearly") {
+              return Boolean(
+                repeatStart &&
+                  date.getDate() === repeatStart.getDate() &&
+                  date.getMonth() === repeatStart.getMonth(),
+              );
+            }
+            const repeatDays = Array.isArray(entry.repeat_days)
+              ? entry.repeat_days
+              : [entryDay];
+            return repeatDays.includes(dayName);
+          })
+          .sort((first, second) =>
+            String(first.start_time || "").localeCompare(
+              String(second.start_time || ""),
+            )
+          );
+
+        if (!dayItems.length) {
+          const empty = document.createElement("p");
+          empty.className = "profiel-uitleg";
+          empty.textContent = "Geen afspraken";
+          daySection.append(empty);
+        }
+        dayItems.forEach((entry) => {
+          const event = document.createElement("article");
+          event.className = "agenda-share-event";
+          if (
+            typeof entry.color === "string" &&
+            window.CSS?.supports("color", entry.color)
+          ) {
+            event.style.borderLeftColor = entry.color;
+          }
+          const title = document.createElement("strong");
+          title.textContent = entry.title || "Afspraak";
+          if (entry.icon) {
+            const icon = document.createElement("span");
+            icon.className = "agenda-share-event-icon";
+            icon.setAttribute("aria-hidden", "true");
+            icon.textContent = entry.icon;
+            title.prepend(icon);
+          }
+          const time = document.createElement("div");
+          const startTime = String(entry.start_time || "").slice(0, 5);
+          const endTime = String(entry.end_time || "").slice(0, 5);
+          time.textContent =
+            startTime === "00:00" && endTime === "23:59"
+              ? "Hele dag"
+              : `${startTime}${endTime ? ` - ${endTime}` : ""}`;
+          event.append(time, title);
+          if (entry.category) {
+            const category = document.createElement("div");
+            category.textContent = entry.category;
+            event.append(category);
+          }
+          if (entry.description) {
+            const description = document.createElement("p");
+            description.textContent = entry.description;
+            event.append(description);
+          }
+          daySection.append(event);
+        });
+        shareWeek.append(daySection);
+      });
+    }
+
+    async function loadSharedAgenda() {
+      if (!shareViewerToken) {
+        return;
+      }
+      const agendaData = await invokeAgendaSharing({
+        action: "view-agenda",
+        viewerToken: shareViewerToken,
+      });
+      shareUsername = agendaData.username;
+      shareItems = agendaData.items;
+      const expiresAt = new Date(agendaData.expiresAt);
+      const remaining = expiresAt.getTime() - Date.now();
+      if (!Number.isFinite(remaining) || remaining <= 0) {
+        clearAgendaShareSession(
+          "De kijktoegang is verlopen. Vraag een nieuwe code aan.",
+        );
+        return;
+      }
+      window.sessionStorage.setItem(
+        "agenda-share-viewer-expiry",
+        expiresAt.toISOString(),
+      );
+      window.sessionStorage.setItem(
+        "agenda-share-viewer-username",
+        shareUsername,
+      );
+      shareHeading.textContent = `Agenda van ${shareUsername}`;
+      shareExpiry.textContent = `Alleen-lezen toegang tot ${new Intl.DateTimeFormat(
+        getAppLocale(),
+        { dateStyle: "long", timeStyle: "short" },
+      ).format(expiresAt)}.`;
+      shareView.hidden = false;
+      shareStatus.textContent = "";
+      renderSharedAgendaWeek();
+      window.clearTimeout(shareExpiryTimer);
+      shareExpiryTimer = window.setTimeout(
+        () =>
+          clearAgendaShareSession(
+            "De kijktoegang is verlopen. Vraag een nieuwe code aan.",
+          ),
+        remaining,
+      );
+    }
+
+    shareForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const submitButton = shareForm.querySelector('button[type="submit"]');
+      submitButton.disabled = true;
+      shareStatus.textContent = "Code controleren...";
+      try {
+        const formData = new FormData(shareForm);
+        const result = await invokeAgendaSharing({
+          action: "redeem-code",
+          username: String(formData.get("username")),
+          code: String(formData.get("code")),
+        });
+        shareViewerToken = result.viewerToken;
+        shareWeekStart = getWeekStart(new Date());
+        window.sessionStorage.setItem(
+          "agenda-share-viewer-token",
+          shareViewerToken,
+        );
+        window.sessionStorage.setItem(
+          "agenda-share-viewer-username",
+          result.username,
+        );
+        await loadSharedAgenda();
+        shareForm.reset();
+      } catch (shareError) {
+        shareStatus.textContent =
+          `De agenda kon niet worden geopend: ${shareError.message}`;
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+
+    shareWeekButtons.previous?.addEventListener("click", async () => {
+      shareWeekStart.setDate(shareWeekStart.getDate() - 7);
+      await reloadSharedWeek();
+    });
+    shareWeekButtons.next?.addEventListener("click", async () => {
+      shareWeekStart.setDate(shareWeekStart.getDate() + 7);
+      await reloadSharedWeek();
+    });
+    shareWeekButtons.today?.addEventListener("click", async () => {
+      shareWeekStart = getWeekStart(new Date());
+      await reloadSharedWeek();
+    });
+
+    async function reloadSharedWeek() {
+      try {
+        await loadSharedAgenda();
+      } catch (shareError) {
+        clearAgendaShareSession(
+          `De gedeelde agenda kan niet worden geladen: ${shareError.message}`,
+        );
+      }
+    }
+
+    shareViewerToken = window.sessionStorage.getItem(
+      "agenda-share-viewer-token",
+    ) || "";
+    if (shareViewerToken) {
+      const savedExpiry = window.sessionStorage.getItem(
+        "agenda-share-viewer-expiry",
+      );
+      const savedUsername = window.sessionStorage.getItem(
+        "agenda-share-viewer-username",
+      ) || "";
+      if (savedExpiry && new Date(savedExpiry).getTime() <= Date.now()) {
+        clearAgendaShareSession(
+          "De kijktoegang is verlopen. Vraag een nieuwe code aan.",
+        );
+      } else {
+        shareUsername = savedUsername;
+        loadSharedAgenda().catch((shareError) => {
+          clearAgendaShareSession(
+            `De gedeelde agenda kan niet worden geladen: ${shareError.message}`,
+          );
+        });
+      }
+    }
+
+    usernameForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const saveButton = usernameForm.querySelector('button[type="submit"]');
+      saveButton.disabled = true;
+      usernameStatus.textContent = "Gebruikersnaam opslaan...";
+      try {
+        const result = await invokeAgendaSharing({
+          action: "set-username",
+          username: usernameInput.value,
+        });
+        usernameInput.value = result.username;
+        shareCodeOutput.hidden = true;
+        usernameStatus.textContent = `Je gebruikersnaam is opgeslagen als ${result.username}.`;
+      } catch (usernameError) {
+        usernameStatus.textContent =
+          `Gebruikersnaam opslaan is niet gelukt: ${usernameError.message}`;
+      } finally {
+        saveButton.disabled = false;
+      }
+    });
+
+    shareCodeButton?.addEventListener("click", async () => {
+      shareCodeButton.disabled = true;
+      shareCodeOutput.hidden = true;
+      shareCodeStatus.textContent = "Eenmalige code maken...";
+      try {
+        const result = await invokeAgendaSharing({ action: "create-code" });
+        shareCodeOutput.textContent =
+          `Eenmalige code: ${result.code} — geldig tot ${new Intl.DateTimeFormat(
+            getAppLocale(),
+            { dateStyle: "long", timeStyle: "short" },
+          ).format(new Date(result.expiresAt))}. Deel deze code veilig; hij wordt niet opnieuw getoond.`;
+        shareCodeOutput.hidden = false;
+        shareCodeStatus.textContent =
+          "Eerdere codes en kijktoegang zijn beëindigd.";
+      } catch (codeError) {
+        shareCodeStatus.textContent =
+          `Eenmalige code maken is niet gelukt: ${codeError.message}`;
+      } finally {
+        shareCodeButton.disabled = false;
+      }
+    });
+
     recoveryForm?.addEventListener("submit", async (event) => {
       event.preventDefault();
       const formData = new FormData(recoveryForm);
@@ -936,6 +1297,17 @@ async function initializeProfilePage() {
     }
 
     let user = data.session.user;
+    if (usernameInput) {
+      try {
+        const usernameData = await invokeAgendaSharing({
+          action: "get-username",
+        });
+        usernameInput.value = usernameData.username;
+      } catch (usernameError) {
+        usernameStatus.textContent =
+          `Je gebruikersnaam kon niet worden geladen: ${usernameError.message}`;
+      }
+    }
     if (languageSelect && languageForm && languageStatus) {
       const savedLanguage = ["nl", "en", "fr", "de"].includes(
         user.user_metadata?.language,
@@ -1542,6 +1914,7 @@ async function initializeProfilePage() {
                     import_source_key: importSourceKey,
                     import_uid: item.import_uid,
                     import_instance: item.import_instance,
+                    description: item.description || null,
                   })
                   .eq("id", legacyMatch.id)
                   .eq("user_id", user.id)
@@ -1975,9 +2348,9 @@ function setupFunctionsNavigation() {
       body.dark-mode { color: #e5e7eb !important; background: #111827 !important; color-scheme: dark; }
       body.dark-mode h1, body.dark-mode h2, body.dark-mode .agenda-day-heading, body.dark-mode .notities-balk h2, body.dark-mode .notitie-editor h2, body.dark-mode .notitie-kaart h2, body.dark-mode .links-header h2, body.dark-mode .todo-balk h2 { color: #e5e7eb !important; }
       body.dark-mode p, body.dark-mode .pagina-intro, body.dark-mode .profiel-uitleg, body.dark-mode #profiel-status, body.dark-mode #profiel-import-status, body.dark-mode .notitie-tekst, body.dark-mode .notitie-datum, body.dark-mode .notities-status, body.dark-mode .todo-status, body.dark-mode .todo-teller { color: #cbd5e1 !important; }
-      body.dark-mode .agenda-container, body.dark-mode .agenda-day-panel, body.dark-mode .agenda-account, body.dark-mode .agenda-item-form, body.dark-mode .profiel-container, body.dark-mode .notitie-editor, body.dark-mode .notitie-kaart, body.dark-mode .notities-aanmelden, body.dark-mode .links-kaart, body.dark-mode .links-formulier, body.dark-mode .todo-paneel, body.dark-mode .todo-formulier, body.dark-mode .todo-aanmelden { border-color: #374151 !important; background: #1f2937 !important; color: #e5e7eb !important; }
+      body.dark-mode .agenda-container, body.dark-mode .agenda-day-panel, body.dark-mode .agenda-account, body.dark-mode .agenda-item-form, body.dark-mode .profiel-container, body.dark-mode .notitie-editor, body.dark-mode .notitie-kaart, body.dark-mode .notities-aanmelden, body.dark-mode .links-kaart, body.dark-mode .links-formulier, body.dark-mode .todo-paneel, body.dark-mode .todo-formulier, body.dark-mode .todo-aanmelden, body.dark-mode .agenda-share-day { border-color: #374151 !important; background: #1f2937 !important; color: #e5e7eb !important; }
       body.dark-mode .agenda-day-panel li, body.dark-mode .agenda-item { border-color: #475569; background: #273449 !important; color: #f3f4f6; }
-      body.dark-mode input, body.dark-mode select, body.dark-mode textarea, body.dark-mode .agenda-item-actions button, body.dark-mode #profiel-foto-knop, body.dark-mode #profiel-exporteren, body.dark-mode #profiel-importeren, body.dark-mode #profiel-agenda-bijwerken, body.dark-mode .notitie-knop-secundair, body.dark-mode .notitie-knop-verwijderen, body.dark-mode .links-knop-secundair, body.dark-mode .links-knop-verwijderen, body.dark-mode .todo-invoer input, body.dark-mode .todo-knop-secundair, body.dark-mode .todo-knop-verwijderen, body.dark-mode .todo-filter { border-color: #4b5563 !important; background: #111827 !important; color: #f3f4f6 !important; }
+      body.dark-mode input, body.dark-mode select, body.dark-mode textarea, body.dark-mode .agenda-item-actions button, body.dark-mode #profiel-foto-knop, body.dark-mode #profiel-exporteren, body.dark-mode #profiel-importeren, body.dark-mode #profiel-agenda-bijwerken, body.dark-mode .notitie-knop-secundair, body.dark-mode .notitie-knop-verwijderen, body.dark-mode .links-knop-secundair, body.dark-mode .links-knop-verwijderen, body.dark-mode .todo-invoer input, body.dark-mode .todo-knop-secundair, body.dark-mode .todo-knop-verwijderen, body.dark-mode .todo-filter, body.dark-mode .profiel-delen button, body.dark-mode .profiel-deel-navigatie button { border-color: #4b5563 !important; background: #111827 !important; color: #f3f4f6 !important; }
       body.dark-mode .dagen-navigatie a, body.dark-mode .functies-menu summary, body.dark-mode .functies-menu-link, body.dark-mode .agenda-week-navigation button { border-color: #4b5563 !important; background: #1f2937 !important; color: #e5e7eb !important; }
       body.dark-mode .dagen-navigatie a:hover, body.dark-mode .dagen-navigatie a:focus-visible, body.dark-mode .functies-menu[open] summary, body.dark-mode .functies-menu-link:hover, body.dark-mode .functies-menu-link:focus-visible, body.dark-mode .agenda-week-navigation button:hover, body.dark-mode .agenda-week-navigation button:focus-visible { background: #374151 !important; }
       body.dark-mode .functies-menu-link[aria-current="page"] { background: #374151 !important; }
@@ -1987,6 +2360,9 @@ function setupFunctionsNavigation() {
       body.dark-mode .todo-item.is-voltooid .todo-tekst { color: #94a3b8 !important; }
       body.dark-mode .todo-leeg { border-color: #475569; color: #cbd5e1 !important; }
       body.dark-mode .todo-filter[aria-pressed="true"] { border-color: #64748b !important; background: #374151 !important; }
+      body.dark-mode .agenda-share-event { background: #273449; }
+      body.dark-mode .agenda-share-event p { color: #cbd5e1 !important; }
+      body.dark-mode .profiel-code-uitvoer { border-color: #475569; background: #111827; color: #e5e7eb; }
     `;
     document.head.append(darkModeStyle);
   }
@@ -3083,6 +3459,8 @@ if (
     let supportsRepeatDays = true;
     let supportsRepeatStartDate = true;
     let supportsCategories = true;
+    let supportsDescriptions = true;
+    let supportsIcons = true;
     const requestedMonth = /^(\d{4})-(\d{2})$/.exec(
       new URLSearchParams(window.location.search).get("maand") || "",
     );
@@ -3261,6 +3639,39 @@ if (
       .agenda-overlap-items .agenda-item.is-overlap-expanded .agenda-item-title { display: inline; overflow: visible; font-size: inherit; line-height: inherit; text-overflow: clip; -webkit-line-clamp: unset; }
       body.dark-mode .agenda-day-panel li.agenda-overlap-group { border-color: transparent !important; border-left-color: transparent !important; background: transparent !important; box-shadow: none !important; }
       body.dark-mode .agenda-overlap-items .agenda-item-time { color: #e5e7eb; }
+      .agenda-detail-dialog { width: min(940px, calc(100vw - 32px)); max-width: none; max-height: min(780px, calc(100dvh - 32px)); padding: 0; overflow: hidden; border: 0; border-radius: 16px; background: #fff; color: #1f2937; box-shadow: 0 24px 80px rgb(15 23 42 / 35%); }
+      .agenda-detail-dialog::backdrop { background: rgb(15 23 42 / 48%); backdrop-filter: blur(2px); }
+      .agenda-detail-shell { display: grid; max-height: inherit; grid-template-rows: auto minmax(0, 1fr) auto; }
+      .agenda-detail-header { display: flex; align-items: center; gap: 14px; padding: 20px 24px; background: #ffd8d2; }
+      .agenda-detail-icon { display: grid; width: 42px; height: 42px; flex: 0 0 auto; place-items: center; border-radius: 12px; background: #fff; color: #c1442e; font-size: 22px; }
+      .agenda-detail-heading { min-width: 0; flex: 1; }
+      .agenda-detail-heading p { margin: 0 0 3px; color: #895b54; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+      .agenda-detail-heading h2 { margin: 0; color: #53342f; font-size: clamp(18px, 3vw, 25px); line-height: 1.25; overflow-wrap: anywhere; }
+      .agenda-detail-close { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 50%; background: transparent; color: #68443e; cursor: pointer; font: inherit; font-size: 25px; }
+      .agenda-detail-close:hover, .agenda-detail-close:focus-visible { background: rgb(255 255 255 / 65%); }
+      .agenda-detail-main { display: grid; min-height: 0; grid-template-columns: minmax(0, 1fr) 260px; gap: 24px; padding: 24px; overflow-y: auto; }
+      .agenda-detail-description h3 { margin: 0 0 10px; color: #183153; font-size: 16px; }
+      .agenda-detail-description p { margin: 0; color: #344256; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .agenda-detail-empty { color: #64748b !important; }
+      .agenda-detail-info { align-self: start; padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; box-shadow: 0 4px 14px rgb(24 49 83 / 8%); }
+      .agenda-detail-info h3 { margin: 0 0 12px; color: #183153; font-size: 15px; }
+      .agenda-detail-info dl { display: grid; gap: 12px; margin: 0; }
+      .agenda-detail-info dt { margin-bottom: 3px; color: #64748b; font-size: 12px; }
+      .agenda-detail-info dd { margin: 0; color: #26364a; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+      .agenda-detail-footer { display: flex; justify-content: flex-end; padding: 12px 24px; border-top: 1px solid #e2e8f0; }
+      .agenda-detail-footer button { min-height: 40px; padding: 8px 18px; border: 0; border-radius: 8px; background: #183153; color: #fff; cursor: pointer; font: inherit; font-weight: 600; }
+      .agenda-detail-footer button:hover, .agenda-detail-footer button:focus-visible { background: #25466f; }
+      body.dark-mode .agenda-detail-dialog { background: #1f2937; color: #e5e7eb; }
+      body.dark-mode .agenda-detail-heading h2, body.dark-mode .agenda-detail-description h3, body.dark-mode .agenda-detail-info h3 { color: #f3f4f6; }
+      body.dark-mode .agenda-detail-description p, body.dark-mode .agenda-detail-info dd { color: #d1d5db; }
+      body.dark-mode .agenda-detail-info { border-color: #374151; background: #111827; }
+      body.dark-mode .agenda-detail-footer { border-color: #374151; }
+      @media (max-width: 600px) {
+        .agenda-detail-dialog { width: calc(100vw - 20px); max-height: calc(100dvh - 20px); border-radius: 12px; }
+        .agenda-detail-header { gap: 10px; padding: 16px; }
+        .agenda-detail-main { grid-template-columns: 1fr; gap: 18px; padding: 18px; }
+        .agenda-detail-footer { padding: 10px 18px; }
+      }
       .agenda-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
       .agenda-filter-field { display: grid; min-width: 160px; flex: 1; gap: 5px; color: #334155; font-size: 13px; font-weight: 600; }
       .agenda-filter-field input, .agenda-filter-field select { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #1f2937; font: inherit; font-size: 16px; }
@@ -3329,6 +3740,157 @@ if (
     if (window.matchMedia("(max-width: 900px)").matches) {
       weekOverview.scrollLeft = dayPanels.get(selectedDay.value).offsetLeft;
     }
+
+    const detailDialog = document.createElement("dialog");
+    detailDialog.className = "agenda-detail-dialog";
+    detailDialog.setAttribute("aria-labelledby", "agenda-detail-title");
+    detailDialog.innerHTML = `
+      <div class="agenda-detail-shell">
+        <header class="agenda-detail-header">
+          <span class="agenda-detail-icon" aria-hidden="true"></span>
+          <div class="agenda-detail-heading">
+            <p>Afspraak bekijken</p>
+            <h2 id="agenda-detail-title"></h2>
+          </div>
+          <button class="agenda-detail-close" type="button" aria-label="Sluiten">×</button>
+        </header>
+        <main class="agenda-detail-main">
+          <section class="agenda-detail-description">
+            <h3>Wat moet je doen?</h3>
+            <p></p>
+          </section>
+          <aside class="agenda-detail-info">
+            <h3>Afspraakgegevens</h3>
+            <dl>
+              <div><dt>Datum</dt><dd data-detail-date></dd></div>
+              <div><dt>Tijd</dt><dd data-detail-time></dd></div>
+              <div data-detail-category-row><dt>Categorie</dt><dd data-detail-category></dd></div>
+            </dl>
+          </aside>
+        </main>
+        <footer class="agenda-detail-footer">
+          <button type="button" data-detail-close>Sluiten</button>
+        </footer>
+      </div>
+    `;
+    document.body.append(detailDialog);
+    const closeDetailButton = detailDialog.querySelector(".agenda-detail-close");
+    const closeDetailFooterButton = detailDialog.querySelector("[data-detail-close]");
+    const closeDetails = () => detailDialog.close();
+    closeDetailButton.addEventListener("click", closeDetails);
+    closeDetailFooterButton.addEventListener("click", closeDetails);
+    detailDialog.addEventListener("click", (event) => {
+      if (event.target === detailDialog) {
+        closeDetails();
+      }
+    });
+
+    function showAgendaDetails(entry, day, endTime) {
+      detailDialog.querySelector(".agenda-detail-icon").textContent =
+        entry.icon || "▦";
+      detailDialog.querySelector("#agenda-detail-title").textContent =
+        entry.title || "Afspraak";
+      const description = detailDialog.querySelector(
+        ".agenda-detail-description p",
+      );
+      description.textContent =
+        entry.description?.trim() || "Er is geen extra beschrijving toegevoegd.";
+      description.classList.toggle("agenda-detail-empty", !entry.description?.trim());
+      detailDialog.querySelector("[data-detail-date]").textContent =
+        new Intl.DateTimeFormat(getAppLocale(), {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }).format(getDateForDay(day));
+      detailDialog.querySelector("[data-detail-time]").textContent =
+        entry.isHoliday || !entry.startText
+          ? "Hele dag"
+          : `${entry.startText} - ${endTime}`;
+      const categoryRow = detailDialog.querySelector(
+        "[data-detail-category-row]",
+      );
+      categoryRow.hidden = !entry.category;
+      detailDialog.querySelector("[data-detail-category]").textContent =
+        entry.category || "";
+      detailDialog.showModal();
+    }
+
+    function addAgendaItemDetailsAction(item, entry, day, endTime) {
+      item.classList.add("agenda-item");
+      item.tabIndex = 0;
+      item.setAttribute("aria-expanded", "false");
+      const actions = document.createElement("div");
+      actions.className = "agenda-item-actions";
+      actions.hidden = true;
+      const viewButton = document.createElement("button");
+      viewButton.type = "button";
+      viewButton.textContent = "Bekijken";
+      viewButton.addEventListener("click", () =>
+        showAgendaDetails(entry, day, endTime),
+      );
+      actions.append(viewButton);
+      item.append(actions);
+
+      function toggleActions() {
+        const isExpanded = actions.hidden;
+        const overlapGroup = item.closest(".agenda-overlap-group");
+        const isGroupedEvent =
+          overlapGroup || item.closest(".agenda-all-day-list");
+        if (isGroupedEvent && isExpanded) {
+          const panel = item.closest(".agenda-day-panel");
+          const top =
+            item.getBoundingClientRect().top -
+            panel.getBoundingClientRect().top +
+            panel.scrollTop;
+          item.style.top = `${top}px`;
+          item.classList.add("is-overlap-expanded");
+        } else if (isGroupedEvent) {
+          item.classList.remove("is-overlap-expanded");
+          item.style.removeProperty("top");
+        }
+        actions.hidden = !isExpanded;
+        item.setAttribute("aria-expanded", String(isExpanded));
+        if (isGroupedEvent) {
+          updateTimeIndicator();
+        }
+      }
+      item.addEventListener("click", (event) => {
+        if (event.target.closest("button, input, label")) {
+          return;
+        }
+        toggleActions();
+      });
+      item.addEventListener("keydown", (event) => {
+        if (event.target !== item || !["Enter", " "].includes(event.key)) {
+          return;
+        }
+        event.preventDefault();
+        toggleActions();
+      });
+    }
+
+    dayLists.forEach((dayList, day) => {
+      Array.from(dayList.children).forEach((item) => {
+        const match = /^\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*:\s*(.*)$/.exec(
+          item.textContent,
+        );
+        const entry = {
+          title: match ? match[3].trim() : item.textContent.trim(),
+          description: "",
+          startText: match?.[1] || "",
+        };
+        if (match) {
+          const toMinutes = (time) => {
+            const [hours, minutes] = time.split(":").map(Number);
+            return hours * 60 + minutes;
+          };
+          item.dataset.start = String(toMinutes(match[1]));
+          item.dataset.end = String(toMinutes(match[2]));
+        }
+        addAgendaItemDetailsAction(item, entry, day, match?.[2] || "");
+      });
+    });
 
     function getDateForDay(day) {
       const date = new Date(displayedWeekStart);
@@ -3834,6 +4396,14 @@ if (
       const titleIndex = columnIndex(["titel", "tittel", "activiteit"]);
       const colorIndex = columnIndex(["kleur", "color"]);
       const categoryIndex = columnIndex(["categorie", "category"]);
+      const iconIndex = columnIndex(["icoon", "icon", "emoji"]);
+      const descriptionIndex = columnIndex([
+        "beschrijving",
+        "omschrijving",
+        "details",
+        "description",
+        "toelichting",
+      ]);
       const dayIndex = columnIndex(["dag", "day"]);
       const endTimeIndex = columnIndex(["eindtijd", "einduur", "end time"]);
 
@@ -3851,6 +4421,8 @@ if (
             time: parseTime(rawTime),
             endTime: parseTime(readCell(row, endTimeIndex))?.start ?? null,
             title: String(readCell(row, titleIndex)).trim(),
+            description: String(readCell(row, descriptionIndex)).trim(),
+            icon: String(readCell(row, iconIndex)).trim(),
             color: String(readCell(row, colorIndex)).trim(),
             category: String(readCell(row, categoryIndex)).trim(),
             day: normalizeDay(readCell(row, dayIndex)),
@@ -4027,6 +4599,12 @@ if (
           const nextEntry = dayEntries[index + 1];
           const end = getEndTime(entry, nextEntry);
           const item = document.createElement("li");
+          item.setAttribute(
+            "aria-label",
+            `${formatTime(entry.time.start)}, ${entry.title}. Selecteer om opties te bekijken.`,
+          );
+          const dayName = day;
+          entry.startText = formatTime(entry.time.start);
           const timeText = document.createElement("span");
           timeText.className = "agenda-item-time";
           timeText.textContent = `${formatTime(entry.time.start)} - ${formatTime(end)}: `;
@@ -4036,6 +4614,7 @@ if (
           item.append(timeText, titleText);
           item.dataset.start = String(entry.time.start);
           item.dataset.end = String(end);
+          addAgendaItemDetailsAction(item, entry, dayName, formatTime(end));
           if (entry.color && !applyColor(item, entry.color)) {
             console.warn(`Ongeldige kleur in de agenda-sheet: ${entry.color}`);
           }
@@ -4123,6 +4702,7 @@ if (
         .agenda-account { margin: 0 0 16px; padding: 16px; border: 1px solid #d6deea; border-radius: 8px; background: #fff; }
         .agenda-account form, .agenda-item-form { display: grid; gap: 10px; }
         .agenda-account input, .agenda-account select, .agenda-item-form input, .agenda-item-form select, .agenda-account button, .agenda-item-form button { min-height: 40px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; }
+        .agenda-item-form textarea { width: 100%; min-height: 92px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; resize: vertical; }
         .agenda-signup-location[hidden] { display: none; }
         .agenda-account button, .agenda-item-form button { cursor: pointer; background: #183153; color: #fff; border-color: #183153; }
         .agenda-account button[type="button"], .agenda-item-form button[type="button"] { background: #fff; color: #183153; }
@@ -4310,6 +4890,12 @@ if (
         </div>
         <label class="agenda-form-field">Activiteit
           <input name="title" type="text" maxlength="200" required>
+        </label>
+        <label class="agenda-form-field">Icoontje (emoji)
+          <input name="icon" type="text" maxlength="12" placeholder="Bijvoorbeeld 📚 of ⚽" autocomplete="off">
+        </label>
+        <label class="agenda-form-field">Wat moet je doen?
+          <textarea name="description" rows="4" maxlength="5000" placeholder="Voeg extra uitleg, materiaal of stappen toe."></textarea>
         </label>
         <label class="agenda-form-field">Herhaling
           <select name="repeat_pattern">
@@ -4535,6 +5121,8 @@ if (
                 ? record.repeat_days
                 : [record.day],
             category: record.category || "",
+            description: record.description || "",
+            icon: record.icon || "",
             rowNumber,
             startText,
           };
@@ -4619,6 +5207,12 @@ if (
             const actions = document.createElement("div");
             actions.className = "agenda-item-actions";
             actions.hidden = true;
+            const viewButton = document.createElement("button");
+            viewButton.type = "button";
+            viewButton.textContent = "Bekijken";
+            viewButton.addEventListener("click", () =>
+              showAgendaDetails(entry, day, formatTime(end)),
+            );
             const editButton = document.createElement("button");
             editButton.type = "button";
             editButton.textContent = "Bewerken";
@@ -4630,6 +5224,9 @@ if (
               ui.itemForm.elements.namedItem("end_time").value =
                 entry.endTime === null ? "" : formatTime(entry.endTime);
               ui.itemForm.elements.namedItem("title").value = entry.title;
+              ui.itemForm.elements.namedItem("description").value =
+                entry.description || "";
+              ui.itemForm.elements.namedItem("icon").value = entry.icon || "";
               ui.itemForm.elements.namedItem("color").value = entry.color;
               ui.itemForm.elements.namedItem("category").value =
                 entry.category;
@@ -4734,7 +5331,7 @@ if (
               toggleActions();
             });
 
-            actions.append(editButton, deleteButton);
+            actions.append(viewButton, editButton, deleteButton);
             item.append(actions);
             dayList.append(item);
           });
@@ -4794,6 +5391,12 @@ if (
             if (supportsCategories) {
               columns.push("category");
             }
+            if (supportsDescriptions) {
+              columns.push("description");
+            }
+            if (supportsIcons) {
+              columns.push("icon");
+            }
             result = await client
               .from("agenda_items")
               .select(columns.join(", "))
@@ -4819,6 +5422,10 @@ if (
               supportsRepeatStartDate = false;
             } else if (missingColumn === "category") {
               supportsCategories = false;
+            } else if (missingColumn === "description") {
+              supportsDescriptions = false;
+            } else if (missingColumn === "icon") {
+              supportsIcons = false;
             } else {
               throw result.error;
             }
@@ -4987,6 +5594,8 @@ if (
           formData.get("repeat_start_date") || "",
         );
         const category = String(formData.get("category") || "");
+        const description = String(formData.get("description") || "").trim();
+        const icon = String(formData.get("icon") || "").trim().slice(0, 12);
         const repeatDays = formData
           .getAll("repeat_days")
           .map(String);
@@ -5035,6 +5644,18 @@ if (
           );
           return;
         }
+        if (!supportsDescriptions && description) {
+          showAccountMessage(
+            "Een beschrijving opslaan kan pas nadat je supabase-setup.sql hebt uitgevoerd.",
+          );
+          return;
+        }
+        if (!supportsIcons && icon) {
+          showAccountMessage(
+            "Een icoontje opslaan kan pas nadat je supabase-setup.sql hebt uitgevoerd.",
+          );
+          return;
+        }
 
         const saveButton = ui.itemForm.querySelector('button[type="submit"]');
         saveButton.disabled = true;
@@ -5071,6 +5692,12 @@ if (
         }
         if (supportsCategories) {
           values.category = category || null;
+        }
+        if (supportsDescriptions) {
+          values.description = description || null;
+        }
+        if (supportsIcons) {
+          values.icon = icon || null;
         }
         if (supportsRepeatDays) {
           values.repeat_days =

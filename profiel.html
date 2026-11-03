@@ -205,6 +205,124 @@
         display: none;
       }
 
+      .profiel-delen {
+        display: grid;
+        gap: 12px;
+      }
+
+      .profiel-delen label {
+        display: grid;
+        gap: 6px;
+        color: #334155;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .profiel-delen input,
+      .profiel-delen button {
+        min-height: 42px;
+        padding: 9px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 7px;
+        font: inherit;
+      }
+
+      .profiel-delen input {
+        width: 100%;
+      }
+
+      .profiel-delen button {
+        justify-self: start;
+        border-color: #183153;
+        background: #183153;
+        color: #fff;
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      .profiel-delen button:disabled {
+        cursor: wait;
+        opacity: 0.7;
+      }
+
+      .profiel-code-uitvoer {
+        padding: 12px;
+        border: 1px dashed #93a6bd;
+        border-radius: 8px;
+        background: #f5f8fc;
+        color: #183153;
+        font-family: monospace;
+        font-size: 16px;
+        overflow-wrap: anywhere;
+      }
+
+      .profiel-deel-navigatie {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .profiel-deel-navigatie button {
+        min-height: 38px;
+        padding: 7px 11px;
+        border: 1px solid #cbd5e1;
+        border-radius: 7px;
+        background: #fff;
+        color: #183153;
+        cursor: pointer;
+        font: inherit;
+      }
+
+      #agenda-share-week {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .agenda-share-day {
+        min-width: 0;
+        padding: 10px;
+        border: 1px solid #d6deea;
+        border-radius: 9px;
+        background: #f8fafc;
+      }
+
+      .agenda-share-day h3 {
+        margin: 0 0 8px;
+        color: #183153;
+        font-size: 14px;
+      }
+
+      .agenda-share-event {
+        margin-top: 7px;
+        padding: 8px;
+        border-left: 4px solid #4f83cc;
+        border-radius: 6px;
+        background: #e8f1ff;
+        font-size: 13px;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+      }
+
+      .agenda-share-event-icon {
+        margin-right: 5px;
+        font-size: 18px;
+        vertical-align: middle;
+      }
+
+      .agenda-share-event p {
+        margin: 5px 0 0;
+        color: #526174;
+        white-space: pre-wrap;
+      }
+
+      @media (max-width: 760px) {
+        #agenda-share-week {
+          grid-template-columns: 1fr;
+        }
+      }
+
       #profiel-uitloggen:disabled {
         cursor: wait;
         opacity: 0.7;
@@ -301,6 +419,24 @@
           </form>
           <p id="profiel-taal-status" role="status" aria-live="polite"></p>
         </section>
+        <section class="profiel-herstel profiel-delen">
+          <h2>Gebruikersprofiel delen</h2>
+          <p>
+            Stel een unieke gebruikersnaam in en maak een eenmalige code om je
+            agenda privé met iemand te delen. De code verloopt na 24 uur; na
+            inwisselen kan die persoon 24 uur alleen kijken. Een nieuwe code
+            beëindigt eerdere gedeelde toegang.
+          </p>
+          <form id="profiel-gebruikersnaam-form">
+            <label for="profiel-gebruikersnaam">Gebruikersnaam</label>
+            <input id="profiel-gebruikersnaam" name="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" autocomplete="username" required />
+            <button type="submit">Gebruikersnaam opslaan</button>
+          </form>
+          <p id="profiel-gebruikersnaam-status" role="status" aria-live="polite"></p>
+          <button id="profiel-deelcode-maken" type="button">Eenmalige kijkcode maken</button>
+          <p id="profiel-deelcode-uitvoer" class="profiel-code-uitvoer" role="status" aria-live="polite" hidden></p>
+          <p id="profiel-deelcode-status" role="status" aria-live="polite"></p>
+        </section>
         <section class="profiel-herstel">
           <h2>Wachtwoord herstellen</h2>
           <p>
@@ -382,6 +518,29 @@
             </p>
           </section>
             <button id="profiel-uitloggen" type="button">Uitloggen</button>
+      </section>
+      <section id="agenda-share-lookup" class="profiel-herstel profiel-delen">
+        <h2>Gebruikersprofiel opzoeken</h2>
+        <p>Vul de gebruikersnaam en de eenmalige kijkcode in die je van die persoon hebt gekregen. De agenda is daarna 24 uur alleen-lezen zichtbaar.</p>
+        <form id="agenda-share-form">
+          <label for="agenda-share-username">Gebruikersnaam</label>
+          <input id="agenda-share-username" name="username" minlength="3" maxlength="24" autocomplete="username" required />
+          <label for="agenda-share-code">Eenmalige code</label>
+          <input id="agenda-share-code" name="code" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="32" pattern="[0-9a-fA-F]{32}" required />
+          <button type="submit">Agenda bekijken</button>
+        </form>
+        <p id="agenda-share-status" role="status" aria-live="polite"></p>
+        <section id="agenda-share-view" hidden>
+          <h2 id="agenda-share-heading"></h2>
+          <p id="agenda-share-expiry"></p>
+          <div class="profiel-deel-navigatie">
+            <button id="agenda-share-prev" type="button">← Vorige week</button>
+            <strong id="agenda-share-week-label"></strong>
+            <button id="agenda-share-today" type="button">Deze week</button>
+            <button id="agenda-share-next" type="button">Volgende week →</button>
+          </div>
+          <div id="agenda-share-week"></div>
+        </section>
       </section>
       <section id="profiel-wachtwoord-herstellen" class="profiel-herstel" hidden>
         <h2>Wachtwoord herstellen met herstelcode</h2>
