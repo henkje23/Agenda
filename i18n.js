@@ -75,6 +75,68 @@
       "Download je volledige agenda als .ics-bestand om die bijvoorbeeld in Google Agenda te importeren.":
         "Download your full calendar as an .ics file to import it into apps such as Google Calendar.",
       "Agenda exporteren (.ics)": "Export calendar (.ics)",
+      "Agenda importeren": "Import calendar",
+      "Voeg afspraken uit een .ics-bestand of een agenda-URL toe aan je agenda. Bij bijwerken blijven je eigen afspraken staan; afspraken die uit de feed zijn verwijderd, worden ook uit je agenda gehaald.":
+        "Add events from an .ics file or calendar URL to your calendar. When syncing, your own events stay; events removed from the feed are also removed from your calendar.",
+      "Kies een .ics-bestand": "Choose an .ics file",
+      "Of plak een agenda-URL (.ics)": "Or paste a calendar URL (.ics)",
+      "Smartschool-links worden rechtstreeks opgehaald. Andere links moeten openbaar zijn en CORS toestaan.":
+        "Smartschool links are fetched directly. Other links must be public and allow CORS.",
+      "Vul een .ics-bestand of een URL in, niet allebei.":
+        "Choose an .ics file or enter a URL, not both.",
+      "Vul een geldige agenda-URL in.": "Enter a valid calendar URL.",
+      "Gebruik een openbare https://-URL zonder gebruikersnaam of wachtwoord.":
+        "Use a public https:// URL without a username or password.",
+      "De URL reageerde niet binnen 20 seconden.":
+        "The URL did not respond within 20 seconds.",
+      "De URL kon niet worden opgehaald. Controleer of de link openbaar is en CORS-toegang toestaat.":
+        "Could not fetch the URL. Check that the link is public and allows CORS access.",
+      "De URL heeft geen agenda-inhoud teruggestuurd.":
+        "The URL did not return calendar content.",
+      "Smartschool-agenda ophalen is mislukt:":
+        "Could not fetch the Smartschool calendar:",
+      "Smartschool heeft geen geldige agenda-inhoud teruggestuurd.":
+        "Smartschool did not return valid calendar content.",
+      "Smartschool heeft geen iCalendar-bestand teruggestuurd. Controleer of de link nog geldig is.":
+        "Smartschool did not return an iCalendar file. Check whether the link is still valid.",
+      "Dit is geen geldige Smartschool-agenda-URL.":
+        "This is not a valid Smartschool calendar URL.",
+      "Smartschool stuurde de agenda door naar een andere URL. Gebruik de actuele agenda-link.":
+        "Smartschool redirected the calendar to another URL. Use the current calendar link.",
+      "Smartschool reageerde niet binnen 20 seconden.":
+        "Smartschool did not respond within 20 seconds.",
+      "De Smartschool-agenda kon niet worden opgehaald.":
+        "Could not fetch the Smartschool calendar.",
+      "De Smartschool-agenda kon niet volledig worden gelezen.":
+        "Could not read the complete Smartschool calendar.",
+      "De Smartschool-agenda is leeg of groter dan 5 MB.":
+        "The Smartschool calendar is empty or larger than 5 MB.",
+      "De Smartschool-agenda is groter dan 5 MB.":
+        "The Smartschool calendar is larger than 5 MB.",
+      "Smartschool gaf HTTP ":
+        "Smartschool returned HTTP ",
+      "Agenda importeren (.ics)": "Import calendar (.ics)",
+      "Agenda bijwerken": "Update calendar",
+      "Agenda bijgewerkt:": "Calendar updated:",
+      "nieuwe of gewijzigde afspraken,": "new or updated events,",
+      "bestaande afspraken gekoppeld,": "existing events matched,",
+      "verwijderde afspraken opgeruimd en": "removed events cleaned up and",
+      "niet-ondersteunde afspraken overgeslagen.":
+        "unsupported events skipped.",
+      "De URL kon niet worden bewaard; plak hem volgende keer opnieuw.":
+        "The URL could not be saved; paste it again next time.",
+      "Kies een .ics-bestand of plak een agenda-URL.":
+        "Choose an .ics file or paste a calendar URL.",
+      "Agenda importeren...": "Importing calendar...",
+      "Dit .ics-bestand is groter dan 5 MB. Kies een kleiner bestand.":
+        "This .ics file is larger than 5 MB. Choose a smaller file.",
+      "Geen importeerbare afspraken gevonden. Terugkerende, ongeldige of meerdaagse afspraken met tijden zijn overgeslagen.":
+        "No importable events found. Recurring, invalid, or timed multi-day events were skipped.",
+      "Importeren is gelukt:": "Import complete:",
+      "afspraken toegevoegd,": "events added,",
+      "afspraken overgeslagen (terugkerend of niet ondersteund).":
+        "events skipped (recurring or unsupported).",
+      "Agenda importeren is mislukt:": "Calendar import failed:",
       "Agenda laden...": "Loading calendar...",
       "Verbinding maken met de agenda...": "Connecting to the calendar...",
       "Je planning laden...": "Loading your schedule...",
@@ -345,6 +407,67 @@
       "Herstelcode maken/vervangen": "Créer/remplacer le code de récupération",
       "Agenda exporteren": "Exporter l'agenda",
       "Agenda exporteren (.ics)": "Exporter l'agenda (.ics)",
+      "Agenda importeren": "Importer l'agenda",
+      "Voeg afspraken uit een .ics-bestand of een agenda-URL toe aan je agenda. Bij bijwerken blijven je eigen afspraken staan; afspraken die uit de feed zijn verwijderd, worden ook uit je agenda gehaald.":
+        "Ajoutez des événements à votre agenda depuis un fichier .ics ou une URL. Lors de la mise à jour, vos propres événements sont conservés ; ceux supprimés du flux le sont aussi de votre agenda.",
+      "Kies een .ics-bestand": "Choisir un fichier .ics",
+      "Of plak een agenda-URL (.ics)": "Ou coller une URL d'agenda (.ics)",
+      "Smartschool-links worden rechtstreeks opgehaald. Andere links moeten openbaar zijn en CORS toestaan.":
+        "Les liens Smartschool sont récupérés directement. Les autres liens doivent être publics et autoriser CORS.",
+      "Vul een .ics-bestand of een URL in, niet allebei.":
+        "Choisissez un fichier .ics ou saisissez une URL, pas les deux.",
+      "Vul een geldige agenda-URL in.": "Saisissez une URL d'agenda valide.",
+      "Gebruik een openbare https://-URL zonder gebruikersnaam of wachtwoord.":
+        "Utilisez une URL https:// publique sans nom d'utilisateur ni mot de passe.",
+      "De URL reageerde niet binnen 20 seconden.":
+        "L'URL n'a pas répondu en 20 secondes.",
+      "De URL kon niet worden opgehaald. Controleer of de link openbaar is en CORS-toegang toestaat.":
+        "Impossible de récupérer l'URL. Vérifiez que le lien est public et autorise CORS.",
+      "De URL heeft geen agenda-inhoud teruggestuurd.":
+        "L'URL n'a renvoyé aucun contenu d'agenda.",
+      "Smartschool-agenda ophalen is mislukt:":
+        "Impossible de récupérer l'agenda Smartschool :",
+      "Smartschool heeft geen geldige agenda-inhoud teruggestuurd.":
+        "Smartschool n'a pas renvoyé de contenu d'agenda valide.",
+      "Smartschool heeft geen iCalendar-bestand teruggestuurd. Controleer of de link nog geldig is.":
+        "Smartschool n'a pas renvoyé de fichier iCalendar. Vérifiez si le lien est toujours valide.",
+      "Dit is geen geldige Smartschool-agenda-URL.":
+        "Cette URL d'agenda Smartschool n'est pas valide.",
+      "Smartschool stuurde de agenda door naar een andere URL. Gebruik de actuele agenda-link.":
+        "Smartschool a redirigé l'agenda vers une autre URL. Utilisez le lien d'agenda actuel.",
+      "Smartschool reageerde niet binnen 20 seconden.":
+        "Smartschool n'a pas répondu en 20 secondes.",
+      "De Smartschool-agenda kon niet worden opgehaald.":
+        "Impossible de récupérer l'agenda Smartschool.",
+      "De Smartschool-agenda kon niet volledig worden gelezen.":
+        "Impossible de lire l'intégralité de l'agenda Smartschool.",
+      "De Smartschool-agenda is leeg of groter dan 5 MB.":
+        "L'agenda Smartschool est vide ou dépasse 5 Mo.",
+      "De Smartschool-agenda is groter dan 5 MB.":
+        "L'agenda Smartschool dépasse 5 Mo.",
+      "Smartschool gaf HTTP ": "Smartschool a renvoyé HTTP ",
+      "Agenda importeren (.ics)": "Importer l'agenda (.ics)",
+      "Agenda bijwerken": "Mettre à jour l'agenda",
+      "Agenda bijgewerkt:": "Agenda mise à jour :",
+      "nieuwe of gewijzigde afspraken,": "nouveaux événements ou événements modifiés,",
+      "bestaande afspraken gekoppeld,": "événements existants associés,",
+      "verwijderde afspraken opgeruimd en": "événements supprimés retirés et",
+      "niet-ondersteunde afspraken overgeslagen.":
+        "événements non pris en charge ignorés.",
+      "De URL kon niet worden bewaard; plak hem volgende keer opnieuw.":
+        "L'URL n'a pas pu être enregistrée ; collez-la à nouveau la prochaine fois.",
+      "Kies een .ics-bestand of plak een agenda-URL.":
+        "Choisissez un fichier .ics ou collez une URL d'agenda.",
+      "Agenda importeren...": "Importation de l'agenda...",
+      "Dit .ics-bestand is groter dan 5 MB. Kies een kleiner bestand.":
+        "Ce fichier .ics dépasse 5 Mo. Choisissez un fichier plus petit.",
+      "Geen importeerbare afspraken gevonden. Terugkerende, ongeldige of meerdaagse afspraken met tijden zijn overgeslagen.":
+        "Aucun événement importable trouvé. Les événements récurrents, invalides ou sur plusieurs jours avec horaires ont été ignorés.",
+      "Importeren is gelukt:": "Importation terminée :",
+      "afspraken toegevoegd,": "événements ajoutés,",
+      "afspraken overgeslagen (terugkerend of niet ondersteund).":
+        "événements ignorés (récurrents ou non pris en charge).",
+      "Agenda importeren is mislukt:": "Échec de l'importation de l'agenda :",
       "Agenda laden...": "Chargement de l'agenda...",
       Uitloggen: "Se déconnecter",
       "Profielfoto kiezen": "Choisir une photo de profil",
@@ -499,6 +622,67 @@
       "Herstelcode maken/vervangen": "Wiederherstellungscode erstellen/ersetzen",
       "Agenda exporteren": "Kalender exportieren",
       "Agenda exporteren (.ics)": "Kalender exportieren (.ics)",
+      "Agenda importeren": "Kalender importieren",
+      "Voeg afspraken uit een .ics-bestand of een agenda-URL toe aan je agenda. Bij bijwerken blijven je eigen afspraken staan; afspraken die uit de feed zijn verwijderd, worden ook uit je agenda gehaald.":
+        "Füge Termine aus einer .ics-Datei oder Kalender-URL hinzu. Bei der Aktualisierung bleiben deine eigenen Termine erhalten; aus dem Feed entfernte Termine werden auch aus deinem Kalender gelöscht.",
+      "Kies een .ics-bestand": "Eine .ics-Datei auswählen",
+      "Of plak een agenda-URL (.ics)": "Oder eine Kalender-URL (.ics) einfügen",
+      "Smartschool-links worden rechtstreeks opgehaald. Andere links moeten openbaar zijn en CORS toestaan.":
+        "Smartschool-Links werden direkt abgerufen. Andere Links müssen öffentlich sein und CORS zulassen.",
+      "Vul een .ics-bestand of een URL in, niet allebei.":
+        "Wähle eine .ics-Datei oder gib eine URL ein, nicht beides.",
+      "Vul een geldige agenda-URL in.": "Gib eine gültige Kalender-URL ein.",
+      "Gebruik een openbare https://-URL zonder gebruikersnaam of wachtwoord.":
+        "Verwende eine öffentliche https://-URL ohne Benutzername oder Passwort.",
+      "De URL reageerde niet binnen 20 seconden.":
+        "Die URL hat innerhalb von 20 Sekunden nicht geantwortet.",
+      "De URL kon niet worden opgehaald. Controleer of de link openbaar is en CORS-toegang toestaat.":
+        "Die URL konnte nicht abgerufen werden. Prüfe, ob der Link öffentlich ist und CORS zulässt.",
+      "De URL heeft geen agenda-inhoud teruggestuurd.":
+        "Die URL hat keinen Kalenderinhalt zurückgegeben.",
+      "Smartschool-agenda ophalen is mislukt:":
+        "Smartschool-Kalender konnte nicht abgerufen werden:",
+      "Smartschool heeft geen geldige agenda-inhoud teruggestuurd.":
+        "Smartschool hat keinen gültigen Kalenderinhalt zurückgegeben.",
+      "Smartschool heeft geen iCalendar-bestand teruggestuurd. Controleer of de link nog geldig is.":
+        "Smartschool hat keine iCalendar-Datei zurückgegeben. Prüfe, ob der Link noch gültig ist.",
+      "Dit is geen geldige Smartschool-agenda-URL.":
+        "Dies ist keine gültige Smartschool-Kalender-URL.",
+      "Smartschool stuurde de agenda door naar een andere URL. Gebruik de actuele agenda-link.":
+        "Smartschool hat den Kalender auf eine andere URL umgeleitet. Verwende den aktuellen Kalenderlink.",
+      "Smartschool reageerde niet binnen 20 seconden.":
+        "Smartschool hat innerhalb von 20 Sekunden nicht geantwortet.",
+      "De Smartschool-agenda kon niet worden opgehaald.":
+        "Der Smartschool-Kalender konnte nicht abgerufen werden.",
+      "De Smartschool-agenda kon niet volledig worden gelezen.":
+        "Der Smartschool-Kalender konnte nicht vollständig gelesen werden.",
+      "De Smartschool-agenda is leeg of groter dan 5 MB.":
+        "Der Smartschool-Kalender ist leer oder größer als 5 MB.",
+      "De Smartschool-agenda is groter dan 5 MB.":
+        "Der Smartschool-Kalender ist größer als 5 MB.",
+      "Smartschool gaf HTTP ": "Smartschool gab HTTP ",
+      "Agenda importeren (.ics)": "Kalender importieren (.ics)",
+      "Agenda bijwerken": "Kalender aktualisieren",
+      "Agenda bijgewerkt:": "Kalender aktualisiert:",
+      "nieuwe of gewijzigde afspraken,": "neue oder geänderte Termine,",
+      "bestaande afspraken gekoppeld,": "vorhandene Termine zugeordnet,",
+      "verwijderde afspraken opgeruimd en": "entfernte Termine gelöscht und",
+      "niet-ondersteunde afspraken overgeslagen.":
+        "nicht unterstützte Termine übersprungen.",
+      "De URL kon niet worden bewaard; plak hem volgende keer opnieuw.":
+        "Die URL konnte nicht gespeichert werden; füge sie beim nächsten Mal erneut ein.",
+      "Kies een .ics-bestand of plak een agenda-URL.":
+        "Wähle eine .ics-Datei oder füge eine Kalender-URL ein.",
+      "Agenda importeren...": "Kalender wird importiert...",
+      "Dit .ics-bestand is groter dan 5 MB. Kies een kleiner bestand.":
+        "Diese .ics-Datei ist größer als 5 MB. Wähle eine kleinere Datei.",
+      "Geen importeerbare afspraken gevonden. Terugkerende, ongeldige of meerdaagse afspraken met tijden zijn overgeslagen.":
+        "Keine importierbaren Termine gefunden. Wiederkehrende, ungültige oder mehrtägige Termine mit Uhrzeit wurden übersprungen.",
+      "Importeren is gelukt:": "Import abgeschlossen:",
+      "afspraken toegevoegd,": "Termine hinzugefügt,",
+      "afspraken overgeslagen (terugkerend of niet ondersteund).":
+        "Termine übersprungen (wiederkehrend oder nicht unterstützt).",
+      "Agenda importeren is mislukt:": "Kalenderimport fehlgeschlagen:",
       "Agenda laden...": "Kalender wird geladen...",
       Uitloggen: "Abmelden",
       "Profielfoto kiezen": "Profilbild auswählen",

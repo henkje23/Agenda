@@ -1,4 +1,4 @@
-const CACHE_NAME = "agenda-v6";
+const CACHE_NAME = "agenda-v16";
 const APP_FILES = [
   "./",
   "./index.html",
@@ -73,6 +73,29 @@ self.addEventListener("fetch", (event) => {
             return offlinePage;
           }
           throw new Error("De pagina is offline niet beschikbaar.");
+        }),
+    );
+    return;
+  }
+
+  if (request.destination === "script") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const responseCopy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseCopy);
+            });
+          }
+          return response;
+        })
+        .catch(async (error) => {
+          const cachedScript = await caches.match(request);
+          if (cachedScript) {
+            return cachedScript;
+          }
+          throw error;
         }),
     );
     return;

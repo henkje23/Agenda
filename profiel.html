@@ -128,7 +128,10 @@
         font: inherit;
       }
 
-      #profiel-exporteren {
+      #profiel-exporteren,
+      #profiel-importeren,
+      #profiel-agenda-bijwerken,
+      #profiel-agenda-verwijderen {
         min-height: 40px;
         margin: 0 0 8px;
         padding: 8px 14px;
@@ -140,12 +143,21 @@
         font: inherit;
       }
 
-      #profiel-exporteren:disabled {
+      #profiel-exporteren:disabled,
+      #profiel-importeren:disabled,
+      #profiel-agenda-bijwerken:disabled,
+      #profiel-agenda-verwijderen:disabled {
         cursor: wait;
         opacity: 0.7;
       }
 
-      #profiel-export-status {
+      #profiel-agenda-verwijderen {
+        border-color: #b42318;
+        background: #b42318;
+      }
+
+      #profiel-export-status,
+      #profiel-import-status {
         color: #526174;
         font-size: 14px;
       }
@@ -311,7 +323,65 @@
           <p id="profiel-export-status" role="status" aria-live="polite">
             Agenda laden...
           </p>
-          <button id="profiel-uitloggen" type="button">Uitloggen</button>
+          <section class="profiel-herstel">
+            <h2>Agenda importeren</h2>
+            <p class="profiel-uitleg">
+              Voeg afspraken uit een .ics-bestand of een agenda-URL toe aan je
+              agenda. Bij bijwerken blijven je eigen afspraken staan; afspraken
+              die uit de feed zijn verwijderd, worden ook uit je agenda gehaald.
+            </p>
+            <form id="profiel-import-form">
+              <label for="profiel-import-bestand">Kies een .ics-bestand</label>
+              <input
+                id="profiel-import-bestand"
+                name="calendar"
+                type="file"
+                accept=".ics,text/calendar"
+              />
+              <label for="profiel-import-url">Of plak een agenda-URL (.ics)</label>
+              <input
+                id="profiel-import-url"
+                name="calendar_url"
+                type="url"
+                inputmode="url"
+                autocomplete="url"
+                placeholder="https://voorbeeld.nl/agenda.ics"
+              />
+              <p class="profiel-uitleg">
+                Smartschool-links worden rechtstreeks opgehaald. Andere links
+                moeten openbaar zijn en CORS toestaan.
+              </p>
+              <p class="profiel-uitleg">
+                Je kunt hieronder de afspraken van de geïmporteerde agenda
+                verwijderen. Voor afspraken uit een geüpload .ics-bestand:
+                kies eerst hetzelfde bestand hierboven. Je eigen afspraken
+                blijven staan, behalve als ze exact overeenkomen met een
+                afspraak in dat bestand.
+              </p>
+              <button id="profiel-importeren" type="submit" disabled>
+                Agenda importeren (.ics)
+              </button>
+              <button
+                id="profiel-agenda-bijwerken"
+                type="button"
+                hidden
+                disabled
+              >
+                Agenda bijwerken
+              </button>
+              <button
+                id="profiel-agenda-verwijderen"
+                type="button"
+                disabled
+              >
+                Geïmporteerde agenda verwijderen
+              </button>
+            </form>
+            <p id="profiel-import-status" role="status" aria-live="polite">
+              Kies een .ics-bestand of plak een agenda-URL.
+            </p>
+          </section>
+            <button id="profiel-uitloggen" type="button">Uitloggen</button>
       </section>
       <section id="profiel-wachtwoord-herstellen" class="profiel-herstel" hidden>
         <h2>Wachtwoord herstellen met herstelcode</h2>

@@ -38,6 +38,488 @@ function formatLocalDate(date) {
   return `${year}-${month}-${day}`;
 }
 
+function parseIcalendarEvents(content) {
+  const lines = content
+    .replace(/\r\n[ \t]/g, "")
+    .replace(/\n[ \t]/g, "")
+    .split(/\r?\n/);
+  const events = [];
+  const skippedUids = new Set();
+  const cancelledUids = new Set();
+  let currentEvent = null;
+  let skippedCount = 0;
+
+  function parseDate(value, isAllDay) {
+    const match = value.match(
+      /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z|[+-]\d{4})?)?$/,
+    );
+    if (!match) {
+      return null;
+    }
+
+    const [, yearText, monthText, dayText, hourText, minuteText, secondText, zone] =
+      match;
+    const year = Number(yearText);
+    const month = Number(monthText);
+    const day = Number(dayText);
+    const hour = Number(hourText || 0);
+    const minute = Number(minuteText || 0);
+    const second = Number(secondText || 0);
+    const dateCheck = new Date(Date.UTC(year, month - 1, day));
+    if (
+      dateCheck.getUTCFullYear() !== year ||
+      dateCheck.getUTCMonth() !== month - 1 ||
+      dateCheck.getUTCDate() !== day ||
+      hour > 23 ||
+      minute > 59 ||
+      second > 59
+    ) {
+      return null;
+    }
+    let date;
+
+    if (isAllDay) {
+      date = new Date(year, month - 1, day, 12);
+    } else {
+      const dateText = `${yearText}-${monthText}-${dayText}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}`;
+      const normalizedZone =
+        zone && zone !== "Z"
+          ? `${zone.slice(0, 3)}:${zone.slice(3)}`
+          : zone || "";
+      date = new Date(`${dateText}${normalizedZone}`);
+    }
+
+    if (!Number.isFinite(date.getTime())) {
+      return null;
+    }
+    if (
+      isAllDay &&
+      (date.getFullYear() !== year ||
+        date.getMonth() !== month - 1 ||
+        date.getDate() !== day)
+    ) {
+      return null;
+    }
+    return date;
+  }
+
+  function addDays(date, days) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+  }
+
+  function getRecurrenceDates(ruleText, startDate) {
+    const parts = Object.fromEntries(
+      ruleText.split(";").map((part) => {
+        const separator = part.indexOf("=");
+        return separator < 0
+          ? [part.toUpperCase(), ""]
+          : [
+              part.slice(0, separator).toUpperCase(),
+              part.slice(separator + 1),
+            ];
+      }),
+    );
+    const supportedParts = new Set([
+      "FREQ",
+      "INTERVAL",
+      "COUNT",
+      "UNTIL",
+      "BYDAY",
+      "BYMONTHDAY",
+      "BYMONTH",
+      "WKST",
+    ]);
+    if (Object.keys(parts).some((part) => !supportedParts.has(part))) {
+      return null;
+    }
+
+    const frequency = parts.FREQ;
+    const interval = Number(parts.INTERVAL || 1);
+    const count = parts.COUNT ? Number(parts.COUNT) : null;
+    const dayNumbers = {
+      SU: 0,
+      MO: 1,
+      TU: 2,
+      WE: 3,
+      TH: 4,
+      FR: 5,
+      SA: 6,
+    };
+    const byDays = parts.BYDAY
+      ? parts.BYDAY.split(",").map((day) => dayNumbers[day])
+      : null;
+    const byMonthDays = parts.BYMONTHDAY
+      ? parts.BYMONTHDAY.split(",").map(Number)
+      : null;
+    const byMonths = parts.BYMONTH
+      ? parts.BYMONTH.split(",").map(Number)
+      : null;
+    const allowedPartsByFrequency = {
+      DAILY: new Set(["FREQ", "INTERVAL", "COUNT", "UNTIL", "BYDAY", "WKST"]),
+      WEEKLY: new Set(["FREQ", "INTERVAL", "COUNT", "UNTIL", "BYDAY", "WKST"]),
+      MONTHLY: new Set([
+        "FREQ",
+        "INTERVAL",
+        "COUNT",
+        "UNTIL",
+        "BYDAY",
+        "BYMONTHDAY",
+        "WKST",
+      ]),
+      YEARLY: new Set([
+        "FREQ",
+        "INTERVAL",
+        "COUNT",
+        "UNTIL",
+        "BYDAY",
+        "BYMONTHDAY",
+        "BYMONTH",
+        "WKST",
+      ]),
+    };
+    const allowedParts = allowedPartsByFrequency[frequency];
+    if (
+      !allowedParts ||
+      Object.keys(parts).some((part) => !allowedParts.has(part)) ||
+      !Number.isInteger(interval) ||
+      interval < 1 ||
+      (count !== null && (!Number.isInteger(count) || count < 1)) ||
+      (byDays && byDays.some((day) => day === undefined)) ||
+      (byMonthDays &&
+        byMonthDays.some(
+          (day) =>
+            !Number.isInteger(day) ||
+            day === 0 ||
+            day < -31 ||
+            day > 31,
+        )) ||
+      (byMonths &&
+        byMonths.some(
+          (month) => !Number.isInteger(month) || month < 1 || month > 12,
+        )) ||
+      (parts.WKST && dayNumbers[parts.WKST] === undefined)
+    ) {
+      return null;
+    }
+
+    const until = parts.UNTIL
+      ? parseDate(parts.UNTIL, !parts.UNTIL.includes("T"))
+      : null;
+    if (parts.UNTIL && !until) {
+      return null;
+    }
+    const recurrenceEnd = addDays(startDate, 366 * 3);
+    const endDate =
+      until && formatLocalDate(until) < formatLocalDate(recurrenceEnd)
+        ? until
+        : recurrenceEnd;
+    const weekStart = parts.WKST
+      ? dayNumbers[parts.WKST]
+      : 1;
+    const startWeek = new Date(startDate);
+    startWeek.setDate(
+      startWeek.getDate() - ((startWeek.getDay() - weekStart + 7) % 7),
+    );
+    const startMonth = startDate.getFullYear() * 12 + startDate.getMonth();
+    const dateOrdinal = (date) =>
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) /
+      86_400_000;
+    const dates = [];
+    let matchedCount = 0;
+
+    for (
+      let date = startDate;
+      date <= endDate;
+      date = addDays(date, 1)
+    ) {
+      const daysSinceStart = dateOrdinal(date) - dateOrdinal(startDate);
+      const weeksSinceStart = Math.floor(
+        (dateOrdinal(date) - dateOrdinal(startWeek)) / 7,
+      );
+      const monthsSinceStart =
+        date.getFullYear() * 12 + date.getMonth() - startMonth;
+      let matchesFrequency = false;
+      if (frequency === "DAILY") {
+        matchesFrequency = daysSinceStart % interval === 0;
+      } else if (frequency === "WEEKLY") {
+        matchesFrequency =
+          weeksSinceStart % interval === 0 &&
+          (byDays || [startDate.getDay()]).includes(date.getDay());
+      } else if (frequency === "MONTHLY") {
+        matchesFrequency =
+          monthsSinceStart % interval === 0 &&
+          (!byMonthDays ||
+            byMonthDays.some((day) =>
+              day > 0
+                ? date.getDate() === day
+                : date.getDate() ===
+                  new Date(date.getFullYear(), date.getMonth() + 1, 0)
+                    .getDate() +
+                    day +
+                    1,
+            )) &&
+          (!byDays || byDays.includes(date.getDay()));
+        if (!byMonthDays && !byDays) {
+          matchesFrequency = matchesFrequency &&
+            date.getDate() === startDate.getDate();
+        }
+      } else if (frequency === "YEARLY") {
+        matchesFrequency =
+          (date.getFullYear() - startDate.getFullYear()) % interval === 0 &&
+          (byMonths || [startDate.getMonth() + 1]).includes(
+            date.getMonth() + 1,
+          ) &&
+          (!byMonthDays ||
+            byMonthDays.some((day) =>
+              day > 0
+                ? date.getDate() === day
+                : date.getDate() ===
+                  new Date(date.getFullYear(), date.getMonth() + 1, 0)
+                    .getDate() +
+                    day +
+                    1,
+            )) &&
+          (!byDays || byDays.includes(date.getDay()));
+        if (!byMonthDays && !byDays) {
+          matchesFrequency = matchesFrequency &&
+            date.getDate() === startDate.getDate();
+        }
+      }
+
+      if (formatLocalDate(date) === formatLocalDate(startDate)) {
+        matchesFrequency = true;
+      }
+      if (!matchesFrequency) {
+        continue;
+      }
+      if (until && dateOrdinal(date) > dateOrdinal(until)) {
+        break;
+      }
+      matchedCount += 1;
+      if (count !== null && matchedCount > count) {
+        break;
+      }
+      dates.push(new Date(date));
+    }
+    return dates;
+  }
+
+  lines.forEach((line) => {
+    if (line === "BEGIN:VEVENT") {
+      currentEvent = {};
+      return;
+    }
+    if (line === "END:VEVENT") {
+      if (!currentEvent) {
+        return;
+      }
+
+      const start = currentEvent.dtstart;
+      const end = currentEvent.dtend;
+      const title = currentEvent.summary?.trim();
+      const uid = currentEvent.uid || "";
+      if (currentEvent.status === "CANCELLED" && uid) {
+        cancelledUids.add(uid);
+        currentEvent = null;
+        return;
+      }
+      if (
+        !start ||
+        !title ||
+        (end && start.isAllDay !== end.isAllDay)
+      ) {
+        skippedCount += 1;
+        if (uid) {
+          skippedUids.add(uid);
+        }
+        currentEvent = null;
+        return;
+      }
+
+      const startDate = parseDate(start.value, start.isAllDay);
+      const endDate = end
+        ? parseDate(end.value, end.isAllDay)
+        : startDate
+          ? start.isAllDay
+            ? addDays(startDate, 1)
+            : new Date(startDate.getTime() + 30 * 60 * 1000)
+          : null;
+      if (!startDate || !endDate || endDate <= startDate) {
+        skippedCount += 1;
+        if (uid) {
+          skippedUids.add(uid);
+        }
+        currentEvent = null;
+        return;
+      }
+
+      const recurrenceDates = currentEvent.rrule
+        ? getRecurrenceDates(currentEvent.rrule, startDate)
+        : [startDate];
+      if (!recurrenceDates) {
+        skippedCount += 1;
+        if (uid) {
+          skippedUids.add(uid);
+        }
+        currentEvent = null;
+        return;
+      }
+
+      const eventDurationDays = Math.round(
+        (Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) -
+          Date.UTC(
+            startDate.getFullYear(),
+            startDate.getMonth(),
+            startDate.getDate(),
+          )) /
+          86_400_000,
+      );
+      if (start.isAllDay && eventDurationDays > 366) {
+        skippedCount += 1;
+        if (uid) {
+          skippedUids.add(uid);
+        }
+        currentEvent = null;
+        return;
+      }
+
+      for (const occurrenceDate of recurrenceDates) {
+        const occurrenceOffset = Math.round(
+          (Date.UTC(
+            occurrenceDate.getFullYear(),
+            occurrenceDate.getMonth(),
+            occurrenceDate.getDate(),
+          ) -
+            Date.UTC(
+              startDate.getFullYear(),
+              startDate.getMonth(),
+              startDate.getDate(),
+            )) /
+            86_400_000,
+        );
+        const occurrenceStart = addDays(startDate, occurrenceOffset);
+        const occurrenceEnd = addDays(endDate, occurrenceOffset);
+        if (start.isAllDay) {
+          for (
+            let date = occurrenceStart;
+            date < occurrenceEnd;
+            date = addDays(date, 1)
+          ) {
+            const occurrenceKey = formatLocalDate(occurrenceStart);
+            const dayKey = formatLocalDate(date);
+            events.push({
+              day: weekdayNames[date.getDay()],
+              start_time: "00:00",
+              end_time: "23:59",
+              title,
+              week_start: formatLocalDate(getWeekStart(date)),
+              repeat_pattern: "once",
+              color: null,
+              import_uid:
+                uid ||
+                `${title}|${formatLocalDate(startDate)}|all-day`,
+              import_instance:
+                currentEvent.rrule
+                  ? `${occurrenceKey}:${dayKey}`
+                  : dayKey,
+            });
+          }
+        } else if (
+          formatLocalDate(occurrenceStart) ===
+          formatLocalDate(occurrenceEnd)
+        ) {
+          const startTime = `${String(occurrenceStart.getHours()).padStart(2, "0")}:${String(occurrenceStart.getMinutes()).padStart(2, "0")}`;
+          const endTime = `${String(occurrenceEnd.getHours()).padStart(2, "0")}:${String(occurrenceEnd.getMinutes()).padStart(2, "0")}`;
+          if (endTime <= startTime) {
+            skippedCount += 1;
+            if (uid) {
+              skippedUids.add(uid);
+            }
+          } else {
+            events.push({
+              day: weekdayNames[occurrenceStart.getDay()],
+              start_time: startTime,
+              end_time: endTime,
+              title,
+              week_start: formatLocalDate(getWeekStart(occurrenceStart)),
+              repeat_pattern: "once",
+              color: null,
+              import_uid:
+                uid ||
+                `${title}|${formatLocalDate(startDate)}|${startTime}`,
+              import_instance: currentEvent.rrule
+                ? formatLocalDate(occurrenceStart)
+                : "",
+            });
+          }
+        } else {
+          skippedCount += 1;
+          if (uid) {
+            skippedUids.add(uid);
+          }
+        }
+      }
+
+      currentEvent = null;
+      return;
+    }
+    if (!currentEvent) {
+      return;
+    }
+
+    const separator = line.indexOf(":");
+    if (separator < 0) {
+      return;
+    }
+    const [propertyName, ...parameters] = line
+      .slice(0, separator)
+      .split(";");
+    const property = propertyName.toUpperCase();
+    const value = line.slice(separator + 1);
+    const parameterValues = Object.fromEntries(
+      parameters.map((parameter) => {
+        const parameterSeparator = parameter.indexOf("=");
+        return parameterSeparator < 0
+          ? [parameter.toUpperCase(), ""]
+          : [
+              parameter.slice(0, parameterSeparator).toUpperCase(),
+              parameter.slice(parameterSeparator + 1).replace(/^"|"$/g, ""),
+            ];
+      }),
+    );
+
+    if (property === "DTSTART" || property === "DTEND") {
+      currentEvent[property.toLowerCase()] = {
+        value,
+        isAllDay:
+          parameterValues.VALUE === "DATE" || !value.includes("T"),
+      };
+    } else if (property === "SUMMARY") {
+      currentEvent.summary = value.replace(/\\([nN,;\\])/g, (_, escaped) =>
+        escaped.toLowerCase() === "n" ? " " : escaped,
+      );
+    } else if (property === "UID") {
+      currentEvent.uid = value;
+    } else if (property === "RRULE") {
+      currentEvent.rrule = value;
+    } else if (property === "STATUS") {
+      currentEvent.status = value.toUpperCase();
+    }
+  });
+
+  if (currentEvent) {
+    skippedCount += 1;
+  }
+  return {
+    events,
+    skippedCount,
+    skippedUids: [...skippedUids],
+    cancelledUids: [...cancelledUids],
+  };
+}
+
 function getEasterSunday(year) {
   const a = year % 19;
   const b = Math.floor(year / 100);
@@ -803,6 +1285,554 @@ async function initializeProfilePage() {
       });
     }
 
+    const importForm = document.querySelector("#profiel-import-form");
+    const importInput = document.querySelector("#profiel-import-bestand");
+    const importUrlInput = document.querySelector("#profiel-import-url");
+    const importButton = document.querySelector("#profiel-importeren");
+    const updateButton = document.querySelector("#profiel-agenda-bijwerken");
+    const deleteCalendarButton = document.querySelector(
+      "#profiel-agenda-verwijderen",
+    );
+    const importStatus = document.querySelector("#profiel-import-status");
+    const savedCalendarUrlKey = `agenda-calendar-url-${user.id}`;
+    const importSourceKey = `calendar-url-${user.id}`;
+    if (
+      importForm &&
+      importInput &&
+      importUrlInput &&
+      importButton &&
+      updateButton &&
+      deleteCalendarButton &&
+      importStatus
+    ) {
+      importButton.disabled = true;
+      let savedCalendarUrl = "";
+      try {
+        savedCalendarUrl = window.localStorage.getItem(savedCalendarUrlKey) || "";
+        if (savedCalendarUrl) {
+          importUrlInput.value = savedCalendarUrl;
+          updateButton.hidden = false;
+        }
+      } catch (error) {
+        console.error("De opgeslagen agenda-URL kon niet worden gelezen.", error);
+        importStatus.textContent =
+          "De opgeslagen agenda-URL kon niet worden gelezen. Vul de URL opnieuw in.";
+      }
+
+      async function importCalendar(file, calendarUrl) {
+        if (Boolean(file) === Boolean(calendarUrl)) {
+          importStatus.textContent =
+            "Kies een .ics-bestand of vul een URL in, niet allebei.";
+          return;
+        }
+
+        if (file && file.size > 5 * 1024 * 1024) {
+          importStatus.textContent =
+            "Dit .ics-bestand is groter dan 5 MB. Kies een kleiner bestand.";
+          return;
+        }
+
+        importButton.disabled = true;
+        updateButton.disabled = true;
+        importStatus.textContent = "Agenda importeren...";
+        let importedCount = 0;
+        let updatedCount = 0;
+        let deletedCount = 0;
+        let calendarUrlSaved = true;
+        let timeoutId;
+        try {
+          let calendarContent;
+          if (file) {
+            calendarContent = await file.text();
+          } else {
+            let url;
+            try {
+              url = new URL(calendarUrl);
+            } catch {
+              throw new Error("Vul een geldige agenda-URL in.");
+            }
+            if (url.protocol !== "https:" || url.username || url.password) {
+              throw new Error(
+                "Gebruik een openbare https://-URL zonder gebruikersnaam of wachtwoord.",
+              );
+            }
+
+            if (url.hostname.endsWith(".smartschool.be")) {
+              const { data: calendarData, error: calendarError } =
+                await client.functions.invoke("smartschool-calendar", {
+                  body: { url: url.href },
+                });
+              if (calendarError) {
+                let errorMessage = calendarError.message;
+                if (calendarError.context instanceof Response) {
+                  try {
+                    const errorBody = await calendarError.context
+                      .clone()
+                      .json();
+                    if (typeof errorBody?.error === "string") {
+                      errorMessage = errorBody.error;
+                    }
+                  } catch (error) {
+                    console.error(
+                      "Smartschool-importfout kon niet worden gelezen.",
+                      error,
+                    );
+                  }
+                }
+                throw new Error(
+                  `Smartschool-agenda ophalen is mislukt: ${errorMessage}`,
+                );
+              }
+              if (typeof calendarData?.calendarContent !== "string") {
+                throw new Error(
+                  "Smartschool heeft geen geldige agenda-inhoud teruggestuurd.",
+                );
+              }
+              calendarContent = calendarData.calendarContent;
+            } else {
+              const controller = new AbortController();
+              timeoutId = window.setTimeout(() => controller.abort(), 20_000);
+              try {
+                let response;
+                try {
+                  response = await fetch(url, {
+                    credentials: "omit",
+                    signal: controller.signal,
+                  });
+                } catch (error) {
+                  if (error.name === "AbortError") {
+                    throw new Error("De URL reageerde niet binnen 20 seconden.");
+                  }
+                  throw new Error(
+                    "De URL kon niet worden opgehaald. Controleer of de link openbaar is en CORS-toegang toestaat.",
+                  );
+                }
+
+                if (!response.ok) {
+                  throw new Error(
+                    `De server gaf HTTP ${response.status} terug.`,
+                  );
+                }
+                const contentLength = Number(
+                  response.headers.get("content-length"),
+                );
+                if (contentLength > 5 * 1024 * 1024) {
+                  throw new Error(
+                    "Dit .ics-bestand is groter dan 5 MB. Kies een kleiner bestand.",
+                  );
+                }
+                if (!response.body) {
+                  throw new Error("De URL heeft geen agenda-inhoud teruggestuurd.");
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                const chunks = [];
+                let byteLength = 0;
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) {
+                    break;
+                  }
+                  byteLength += value.byteLength;
+                  if (byteLength > 5 * 1024 * 1024) {
+                    await reader.cancel();
+                    throw new Error(
+                      "Dit .ics-bestand is groter dan 5 MB. Kies een kleiner bestand.",
+                    );
+                  }
+                  chunks.push(decoder.decode(value, { stream: true }));
+                }
+                chunks.push(decoder.decode());
+                calendarContent = chunks.join("");
+              } catch (error) {
+                if (error.name === "AbortError") {
+                  throw new Error("De URL reageerde niet binnen 20 seconden.");
+                }
+                throw error;
+              } finally {
+                window.clearTimeout(timeoutId);
+                timeoutId = undefined;
+              }
+            }
+          }
+
+          const {
+            events,
+            skippedCount,
+            skippedUids,
+            cancelledUids,
+          } = parseIcalendarEvents(calendarContent);
+          if (!events.length && (!calendarUrl || !cancelledUids.length)) {
+            importStatus.textContent =
+              "Geen importeerbare afspraken gevonden. Terugkerende, ongeldige of meerdaagse afspraken met tijden zijn overgeslagen.";
+            return;
+          }
+
+          if (!calendarUrl) {
+            for (let index = 0; index < events.length; index += 100) {
+              const batch = events.slice(index, index + 100).map((item) => {
+                const { import_uid, import_instance, ...agendaItem } = item;
+                return { ...agendaItem, user_id: user.id };
+              });
+              const { error: importError } = await client
+                .from("agenda_items")
+                .insert(batch);
+              if (importError) {
+                throw new Error(
+                  importedCount
+                    ? `${importedCount} afspraken zijn al toegevoegd. ${importError.message}`
+                    : importError.message,
+                );
+              }
+              importedCount += batch.length;
+            }
+          } else {
+            const { data: sourceRows, error: sourceError } = await client
+              .from("agenda_items")
+              .select(
+                "id, import_uid, import_instance, day, start_time, end_time, title, week_start",
+              )
+              .eq("user_id", user.id)
+              .eq("import_source_key", importSourceKey);
+            if (sourceError) {
+              throw sourceError;
+            }
+
+            const { data: legacyRows, error: legacyError } = await client
+              .from("agenda_items")
+              .select(
+                "id, day, start_time, end_time, title, week_start",
+              )
+              .eq("user_id", user.id)
+              .is("import_source_key", null)
+              .is("import_uid", null);
+            if (legacyError) {
+              throw legacyError;
+            }
+
+            const makeFingerprint = (item) =>
+              JSON.stringify([
+                item.week_start,
+                item.day,
+                String(item.start_time).slice(0, 5),
+                item.end_time ? String(item.end_time).slice(0, 5) : "",
+                item.title,
+              ]);
+            const legacyByFingerprint = new Map();
+            legacyRows.forEach((row) => {
+              const fingerprint = makeFingerprint(row);
+              const matches = legacyByFingerprint.get(fingerprint) || [];
+              matches.push(row);
+              legacyByFingerprint.set(fingerprint, matches);
+            });
+
+            const activeKeys = new Set();
+            const pendingUpserts = [];
+            for (const item of events) {
+              const key = `${item.import_uid}\u0000${item.import_instance}`;
+              activeKeys.add(key);
+              const legacyMatches =
+                legacyByFingerprint.get(makeFingerprint(item)) || [];
+              const legacyMatch = legacyMatches.shift();
+              if (legacyMatch) {
+                const { data: adoptedRow, error: adoptError } = await client
+                  .from("agenda_items")
+                  .update({
+                    import_source_key: importSourceKey,
+                    import_uid: item.import_uid,
+                    import_instance: item.import_instance,
+                  })
+                  .eq("id", legacyMatch.id)
+                  .eq("user_id", user.id)
+                  .is("import_source_key", null)
+                  .is("import_uid", null)
+                  .select("id")
+                  .maybeSingle();
+                if (adoptError) {
+                  throw adoptError;
+                }
+                if (adoptedRow) {
+                  updatedCount += 1;
+                  continue;
+                }
+              }
+              pendingUpserts.push({
+                ...item,
+                user_id: user.id,
+                import_source_key: importSourceKey,
+              });
+            }
+
+            for (
+              let index = 0;
+              index < pendingUpserts.length;
+              index += 100
+            ) {
+              const batch = pendingUpserts.slice(index, index + 100);
+              const { data: upsertedRows, error: upsertError } = await client
+                .from("agenda_items")
+                .upsert(batch, {
+                  onConflict:
+                    "user_id,import_source_key,import_uid,import_instance",
+                })
+                .select("id");
+              if (upsertError) {
+                throw new Error(
+                  importedCount || updatedCount
+                    ? `${importedCount + updatedCount} afspraken zijn al bijgewerkt. ${upsertError.message}`
+                    : upsertError.message,
+                );
+              }
+              importedCount += upsertedRows?.length || batch.length;
+            }
+
+            const skippedUidSet = new Set(skippedUids);
+            const cancelledUidSet = new Set(cancelledUids);
+            const staleIds = sourceRows
+              .filter((row) => {
+                const key = `${row.import_uid}\u0000${row.import_instance}`;
+                return (
+                  !activeKeys.has(key) &&
+                  (cancelledUidSet.has(row.import_uid) ||
+                    !skippedUidSet.has(row.import_uid))
+                );
+              })
+              .map((row) => row.id);
+            for (let index = 0; index < staleIds.length; index += 100) {
+              const batch = staleIds.slice(index, index + 100);
+              const { error: deleteError } = await client
+                .from("agenda_items")
+                .delete()
+                .eq("user_id", user.id)
+                .eq("import_source_key", importSourceKey)
+                .in("id", batch);
+              if (deleteError) {
+                throw new Error(
+                  `De afspraken zijn bijgewerkt, maar ${staleIds.length - deletedCount} oude afspraken konden niet worden verwijderd: ${deleteError.message}`,
+                );
+              }
+              deletedCount += batch.length;
+            }
+
+            savedCalendarUrl = calendarUrl;
+            importUrlInput.value = calendarUrl;
+            updateButton.hidden = false;
+            try {
+              window.localStorage.setItem(
+                savedCalendarUrlKey,
+                savedCalendarUrl,
+              );
+            } catch (error) {
+              console.error("De agenda-URL kon niet worden opgeslagen.", error);
+              calendarUrlSaved = false;
+            }
+          }
+
+          importStatus.textContent = calendarUrl
+            ? `Agenda bijgewerkt: ${importedCount} nieuwe of gewijzigde afspraken, ${updatedCount} bestaande afspraken gekoppeld, ${deletedCount} verwijderde afspraken opgeruimd en ${skippedCount} niet-ondersteunde afspraken overgeslagen.${calendarUrlSaved ? "" : " De URL kon niet worden bewaard; plak hem volgende keer opnieuw."}`
+            : `Importeren is gelukt: ${importedCount} afspraken toegevoegd, ${skippedCount} afspraken overgeslagen (terugkerend of niet ondersteund).`;
+          if (file) {
+            importForm.reset();
+          }
+        } catch (error) {
+          console.error("Agenda importeren is mislukt.", error);
+          importStatus.textContent = `Agenda importeren is mislukt: ${error.message}`;
+        } finally {
+          importButton.disabled = false;
+          updateButton.disabled = false;
+        }
+      }
+
+      importForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        importCalendar(
+          importInput.files?.[0],
+          importUrlInput.value.trim(),
+        );
+      });
+      importInput.addEventListener("change", () => {
+        if (importInput.files?.length) {
+          importUrlInput.value = "";
+        }
+      });
+      importUrlInput.addEventListener("input", () => {
+        if (importUrlInput.value.trim()) {
+          importInput.value = "";
+        }
+      });
+      updateButton.addEventListener("click", () => {
+        if (savedCalendarUrl) {
+          importCalendar(null, savedCalendarUrl);
+        }
+      });
+      deleteCalendarButton.addEventListener("click", async () => {
+        importButton.disabled = true;
+        updateButton.disabled = true;
+        deleteCalendarButton.disabled = true;
+        importStatus.textContent = "Geïmporteerde afspraken zoeken...";
+        let deletedCount = 0;
+        try {
+          const calendarFile = importInput.files?.[0];
+          const calendarFingerprints = new Set();
+          if (calendarFile) {
+            if (calendarFile.size > 5 * 1024 * 1024) {
+              throw new Error(
+                "Dit .ics-bestand is groter dan 5 MB. Kies een kleiner bestand.",
+              );
+            }
+            const parsedCalendar = parseIcalendarEvents(
+              await calendarFile.text(),
+            );
+            if (!parsedCalendar.events.length) {
+              throw new Error(
+                "In dit .ics-bestand zijn geen afspraken gevonden om te verwijderen.",
+              );
+            }
+            const makeFingerprint = (item) =>
+              JSON.stringify([
+                item.week_start,
+                item.day,
+                String(item.start_time).slice(0, 5),
+                item.end_time ? String(item.end_time).slice(0, 5) : "",
+                item.title,
+              ]);
+            parsedCalendar.events.forEach((item) => {
+              calendarFingerprints.add(makeFingerprint(item));
+              const date = new Date(`${item.week_start}T12:00:00`);
+              const dayOffset =
+                (weekdayNames.indexOf(item.day) + 6) % 7;
+              date.setDate(date.getDate() + dayOffset);
+              calendarFingerprints.add(
+                makeFingerprint({
+                  ...item,
+                  week_start: formatLocalDate(date),
+                }),
+              );
+            });
+          }
+
+          const { count: taggedCount, error: countError } = await client
+            .from("agenda_items")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .eq("import_source_key", importSourceKey);
+          if (countError) {
+            throw countError;
+          }
+
+          const matchingFileIds = [];
+          if (calendarFingerprints.size) {
+            const pageSize = 500;
+            let offset = 0;
+            while (true) {
+              const { data: rows, error: rowsError } = await client
+                .from("agenda_items")
+                .select(
+                  "id, day, start_time, end_time, title, week_start",
+                )
+                .eq("user_id", user.id)
+                .is("import_source_key", null)
+                .is("import_uid", null)
+                .order("id", { ascending: true })
+                .range(offset, offset + pageSize - 1);
+              if (rowsError) {
+                throw rowsError;
+              }
+              (rows || []).forEach((row) => {
+                const fingerprint = JSON.stringify([
+                  row.week_start,
+                  row.day,
+                  String(row.start_time).slice(0, 5),
+                  row.end_time ? String(row.end_time).slice(0, 5) : "",
+                  row.title,
+                ]);
+                if (calendarFingerprints.has(fingerprint)) {
+                  matchingFileIds.push(row.id);
+                }
+              });
+              if (!rows || rows.length < pageSize) {
+                break;
+              }
+              offset += rows.length;
+            }
+          }
+
+          const matchedCount = matchingFileIds.length;
+          const totalCount = (taggedCount || 0) + matchedCount;
+          if (!totalCount) {
+            importStatus.textContent = calendarFile
+              ? "Er zijn geen afspraken gevonden die overeenkomen met dit bestand. Controleer of je hetzelfde .ics-bestand hebt gekozen."
+              : "Geen gekoppelde agenda-afspraken gevonden. Kies hierboven hetzelfde .ics-bestand als je de agenda als bestand had geïmporteerd.";
+            return;
+          }
+          const confirmation = calendarFile
+            ? `${totalCount} afspraken verwijderen: afspraken die bij deze .ics-inhoud passen${taggedCount ? ` en ${taggedCount} gekoppelde URL-afspraken` : ""}? Eigen afspraken met exact dezelfde titel, datum en tijden kunnen ook worden verwijderd. Dit kan niet ongedaan worden gemaakt.`
+            : `${taggedCount} afspraken van de gekoppelde agenda-URL verwijderen? Eigen afspraken blijven staan. Dit kan niet ongedaan worden gemaakt.`;
+          if (!window.confirm(confirmation)) {
+            importStatus.textContent = "Verwijderen geannuleerd.";
+            return;
+          }
+
+          importStatus.textContent = "Geïmporteerde afspraken verwijderen...";
+          if (taggedCount) {
+            const { error: deleteError } = await client
+              .from("agenda_items")
+              .delete()
+              .eq("user_id", user.id)
+              .eq("import_source_key", importSourceKey);
+            if (deleteError) {
+              throw deleteError;
+            }
+            deletedCount += taggedCount;
+          }
+          for (
+            let index = 0;
+            index < matchingFileIds.length;
+            index += 100
+          ) {
+            const { error: deleteError } = await client
+              .from("agenda_items")
+              .delete()
+              .eq("user_id", user.id)
+              .in("id", matchingFileIds.slice(index, index + 100));
+            if (deleteError) {
+              throw deleteError;
+            }
+            deletedCount += matchingFileIds.slice(index, index + 100).length;
+          }
+
+          savedCalendarUrl = "";
+          importUrlInput.value = "";
+          importInput.value = "";
+          updateButton.hidden = true;
+          let savedUrlRemoved = true;
+          try {
+            window.localStorage.removeItem(savedCalendarUrlKey);
+          } catch (error) {
+            console.error(
+              "De opgeslagen agenda-URL kon niet worden verwijderd.",
+              error,
+            );
+            savedUrlRemoved = false;
+          }
+          importStatus.textContent =
+            `${totalCount} afspraken van de geïmporteerde agenda verwijderd.${savedUrlRemoved ? "" : " De URL kon niet uit deze browser worden verwijderd."}`;
+        } catch (error) {
+          console.error("Geïmporteerde afspraken verwijderen is mislukt.", error);
+          importStatus.textContent =
+            `${deletedCount ? `${deletedCount} afspraken zijn al verwijderd. ` : ""}De geïmporteerde agenda kon niet volledig worden verwijderd: ${error.message}`;
+        } finally {
+          importButton.disabled = false;
+          updateButton.disabled = false;
+          deleteCalendarButton.disabled = false;
+        }
+      });
+      importButton.disabled = false;
+      updateButton.disabled = false;
+      deleteCalendarButton.disabled = false;
+    }
+
     avatarButton.addEventListener("click", () => avatarInput.click());
     avatarInput.addEventListener("change", async () => {
       const file = avatarInput.files?.[0];
@@ -944,10 +1974,10 @@ function setupFunctionsNavigation() {
     darkModeStyle.textContent = `
       body.dark-mode { color: #e5e7eb !important; background: #111827 !important; color-scheme: dark; }
       body.dark-mode h1, body.dark-mode h2, body.dark-mode .agenda-day-heading, body.dark-mode .notities-balk h2, body.dark-mode .notitie-editor h2, body.dark-mode .notitie-kaart h2, body.dark-mode .links-header h2, body.dark-mode .todo-balk h2 { color: #e5e7eb !important; }
-      body.dark-mode p, body.dark-mode .pagina-intro, body.dark-mode .profiel-uitleg, body.dark-mode #profiel-status, body.dark-mode .notitie-tekst, body.dark-mode .notitie-datum, body.dark-mode .notities-status, body.dark-mode .todo-status, body.dark-mode .todo-teller { color: #cbd5e1 !important; }
+      body.dark-mode p, body.dark-mode .pagina-intro, body.dark-mode .profiel-uitleg, body.dark-mode #profiel-status, body.dark-mode #profiel-import-status, body.dark-mode .notitie-tekst, body.dark-mode .notitie-datum, body.dark-mode .notities-status, body.dark-mode .todo-status, body.dark-mode .todo-teller { color: #cbd5e1 !important; }
       body.dark-mode .agenda-container, body.dark-mode .agenda-day-panel, body.dark-mode .agenda-account, body.dark-mode .agenda-item-form, body.dark-mode .profiel-container, body.dark-mode .notitie-editor, body.dark-mode .notitie-kaart, body.dark-mode .notities-aanmelden, body.dark-mode .links-kaart, body.dark-mode .links-formulier, body.dark-mode .todo-paneel, body.dark-mode .todo-formulier, body.dark-mode .todo-aanmelden { border-color: #374151 !important; background: #1f2937 !important; color: #e5e7eb !important; }
       body.dark-mode .agenda-day-panel li, body.dark-mode .agenda-item { border-color: #475569; background: #273449 !important; color: #f3f4f6; }
-      body.dark-mode input, body.dark-mode select, body.dark-mode textarea, body.dark-mode .agenda-item-actions button, body.dark-mode #profiel-foto-knop, body.dark-mode #profiel-exporteren, body.dark-mode .notitie-knop-secundair, body.dark-mode .notitie-knop-verwijderen, body.dark-mode .links-knop-secundair, body.dark-mode .links-knop-verwijderen, body.dark-mode .todo-invoer input, body.dark-mode .todo-knop-secundair, body.dark-mode .todo-knop-verwijderen, body.dark-mode .todo-filter { border-color: #4b5563 !important; background: #111827 !important; color: #f3f4f6 !important; }
+      body.dark-mode input, body.dark-mode select, body.dark-mode textarea, body.dark-mode .agenda-item-actions button, body.dark-mode #profiel-foto-knop, body.dark-mode #profiel-exporteren, body.dark-mode #profiel-importeren, body.dark-mode #profiel-agenda-bijwerken, body.dark-mode .notitie-knop-secundair, body.dark-mode .notitie-knop-verwijderen, body.dark-mode .links-knop-secundair, body.dark-mode .links-knop-verwijderen, body.dark-mode .todo-invoer input, body.dark-mode .todo-knop-secundair, body.dark-mode .todo-knop-verwijderen, body.dark-mode .todo-filter { border-color: #4b5563 !important; background: #111827 !important; color: #f3f4f6 !important; }
       body.dark-mode .dagen-navigatie a, body.dark-mode .functies-menu summary, body.dark-mode .functies-menu-link, body.dark-mode .agenda-week-navigation button { border-color: #4b5563 !important; background: #1f2937 !important; color: #e5e7eb !important; }
       body.dark-mode .dagen-navigatie a:hover, body.dark-mode .dagen-navigatie a:focus-visible, body.dark-mode .functies-menu[open] summary, body.dark-mode .functies-menu-link:hover, body.dark-mode .functies-menu-link:focus-visible, body.dark-mode .agenda-week-navigation button:hover, body.dark-mode .agenda-week-navigation button:focus-visible { background: #374151 !important; }
       body.dark-mode .functies-menu-link[aria-current="page"] { background: #374151 !important; }
@@ -2355,7 +3385,8 @@ if (
         : entry.repeatPattern || "weekly";
       if (
         entry.weekStart &&
-        entry.weekStart !== formatLocalDate(getWeekStart(date))
+        entry.weekStart !== formatLocalDate(getWeekStart(date)) &&
+        entry.weekStart !== formatLocalDate(date)
       ) {
         return false;
       }
@@ -3726,7 +4757,7 @@ if (
             ? " Geen afspraken gevonden met deze zoekopdracht of categorie."
             : "";
         status.textContent = currentItems.length
-          ? `Je weekplanning is geladen en per dag op begintijd gesorteerd.${repeatDaysNotice}${schemaNotice}${filterNotice}`
+          ? `${records.length} opgeslagen afspraken geladen; ${visibleCount} afspraken zichtbaar deze week. Per dag gesorteerd op begintijd.${repeatDaysNotice}${schemaNotice}${filterNotice}`
           : `Je hebt nog geen afspraken voor ${selectedDay.value}.${repeatDaysNotice}${schemaNotice}`;
         updateTimeIndicator();
       }
@@ -3737,61 +4768,73 @@ if (
         }
 
         status.textContent = "Je planning laden...";
-        let result;
+        const records = [];
+        const pageSize = 500;
+        let offset = 0;
         while (true) {
-          const columns = [
-            "id",
-            "user_id",
-            "day",
-            "start_time",
-            "end_time",
-            "title",
-            "color",
-            "week_start",
-            "repeat_pattern",
-          ];
-          if (supportsRepeatDays) {
-            columns.push("repeat_days");
-          }
-          if (supportsRepeatStartDate) {
-            columns.push("repeat_start_date");
-          }
-          if (supportsCategories) {
-            columns.push("category");
-          }
-          result = await client
-            .from("agenda_items")
-            .select(columns.join(", "))
-            .eq("user_id", currentUser.id)
-            .order("start_time", { ascending: true })
-            .order("id", { ascending: true });
-          if (!["42703", "PGRST204"].includes(String(result.error?.code))) {
-            break;
+          let result;
+          while (true) {
+            const columns = [
+              "id",
+              "user_id",
+              "day",
+              "start_time",
+              "end_time",
+              "title",
+              "color",
+              "week_start",
+              "repeat_pattern",
+            ];
+            if (supportsRepeatDays) {
+              columns.push("repeat_days");
+            }
+            if (supportsRepeatStartDate) {
+              columns.push("repeat_start_date");
+            }
+            if (supportsCategories) {
+              columns.push("category");
+            }
+            result = await client
+              .from("agenda_items")
+              .select(columns.join(", "))
+              .eq("user_id", currentUser.id)
+              .order("start_time", { ascending: true })
+              .order("id", { ascending: true })
+              .range(offset, offset + pageSize - 1);
+            if (!["42703", "PGRST204"].includes(String(result.error?.code))) {
+              break;
+            }
+
+            const errorMessage = String(result.error.message);
+            const missingColumn =
+              errorMessage.match(
+                /column\s+(?:[\w"]+\.)?"?([a-z_]+)"?\s+does not exist/i,
+              )?.[1] ||
+              errorMessage.match(
+                /could not find the ['"]([a-z_]+)['"] column of ['"]agenda_items['"]/i,
+              )?.[1];
+            if (missingColumn === "repeat_days") {
+              supportsRepeatDays = false;
+            } else if (missingColumn === "repeat_start_date") {
+              supportsRepeatStartDate = false;
+            } else if (missingColumn === "category") {
+              supportsCategories = false;
+            } else {
+              throw result.error;
+            }
           }
 
-          const errorMessage = String(result.error.message);
-          const missingColumn =
-            errorMessage.match(
-              /column\s+(?:[\w"]+\.)?"?([a-z_]+)"?\s+does not exist/i,
-            )?.[1] ||
-            errorMessage.match(
-              /could not find the ['"]([a-z_]+)['"] column of ['"]agenda_items['"]/i,
-            )?.[1];
-          if (missingColumn === "repeat_days") {
-            supportsRepeatDays = false;
-          } else if (missingColumn === "repeat_start_date") {
-            supportsRepeatStartDate = false;
-          } else if (missingColumn === "category") {
-            supportsCategories = false;
-          } else {
+          if (result.error) {
             throw result.error;
           }
+          const page = result.data || [];
+          records.push(...page);
+          if (page.length < pageSize) {
+            break;
+          }
+          offset += page.length;
         }
-
-        if (result.error) {
-          throw result.error;
-        }
-        renderUserItems(result.data || []);
+        renderUserItems(records);
       }
 
       function resetItemForm() {

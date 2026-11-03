@@ -1,7 +1,8 @@
 -- Run this in Supabase SQL Editor to enable private notes, links, todo tasks,
 -- repeating agenda items, and the private storage used by password recovery
 -- codes.
--- Password recovery also requires deploying the password-recovery Edge Function.
+-- Password recovery and Smartschool URL import require deploying their Edge
+-- Functions: password-recovery and smartschool-calendar.
 begin;
 
 alter table if exists public.agenda_items
@@ -9,7 +10,10 @@ alter table if exists public.agenda_items
   add column if not exists repeat_pattern text not null default 'weekly',
   add column if not exists repeat_days text[],
   add column if not exists repeat_start_date date,
-  add column if not exists category text;
+  add column if not exists category text,
+  add column if not exists import_source_key text,
+  add column if not exists import_uid text,
+  add column if not exists import_instance text not null default '';
 
 create table if not exists public.notes (
   id uuid primary key default gen_random_uuid(),
@@ -51,6 +55,14 @@ create index if not exists notes_user_updated_idx
 
 create index if not exists agenda_items_user_start_idx
   on public.agenda_items (user_id, start_time);
+
+create unique index if not exists agenda_items_import_source_uid_idx
+  on public.agenda_items (
+    user_id,
+    import_source_key,
+    import_uid,
+    import_instance
+  );
 
 create index if not exists user_links_user_created_idx
   on public.user_links (user_id, created_at desc);
