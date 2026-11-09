@@ -1678,6 +1678,7 @@ async function initializeProfilePage() {
       importStatus
     ) {
       importButton.disabled = true;
+      let importInProgress = false;
       let savedCalendarUrl = "";
       try {
         savedCalendarUrl = window.localStorage.getItem(savedCalendarUrlKey) || "";
@@ -1704,6 +1705,10 @@ async function initializeProfilePage() {
           return;
         }
 
+        if (importInProgress) {
+          return;
+        }
+        importInProgress = true;
         importButton.disabled = true;
         updateButton.disabled = true;
         importStatus.textContent = "Agenda importeren...";
@@ -2012,6 +2017,7 @@ async function initializeProfilePage() {
           console.error("Agenda importeren is mislukt.", error);
           importStatus.textContent = `Agenda importeren is mislukt: ${error.message}`;
         } finally {
+          importInProgress = false;
           importButton.disabled = false;
           updateButton.disabled = false;
         }
@@ -2039,6 +2045,11 @@ async function initializeProfilePage() {
           importCalendar(null, savedCalendarUrl);
         }
       });
+      window.setInterval(() => {
+        if (savedCalendarUrl && !importInProgress && !deleteCalendarButton.disabled) {
+          importCalendar(null, savedCalendarUrl);
+        }
+      }, 5 * 60 * 1000);
       deleteCalendarButton.addEventListener("click", async () => {
         importButton.disabled = true;
         updateButton.disabled = true;
@@ -3592,6 +3603,29 @@ if (
       dayHeader.className = "agenda-day-header";
       dayHeader.append(heading);
 
+      const resizeHandle = document.createElement("button");
+      resizeHandle.type = "button";
+      resizeHandle.className = "agenda-column-resize-handle";
+      resizeHandle.setAttribute(
+        "aria-label",
+        `Kolom ${day} breder maken`,
+      );
+      resizeHandle.title = "Sleep om deze dagkolom breder of smaller te maken";
+      resizeHandle.textContent = "⋮";
+      dayHeader.append(resizeHandle);
+
+      const timeGrid = document.createElement("div");
+      timeGrid.className = "agenda-time-grid";
+      const timeAxis = document.createElement("div");
+      timeAxis.className = "agenda-time-axis";
+      timeAxis.setAttribute("aria-hidden", "true");
+      for (let hour = 0; hour < 24; hour += 1) {
+        const label = document.createElement("span");
+        label.textContent = `${String(hour).padStart(2, "0")}:00`;
+        label.style.top = `${hour * 60}px`;
+        timeAxis.append(label);
+      }
+
       const indicator = document.createElement("div");
       indicator.className = "agenda-time-indicators";
       indicator.setAttribute("aria-hidden", "true");
@@ -3600,11 +3634,157 @@ if (
         day === weekdayNames[currentPageWeekday]
           ? list
           : document.createElement("ul");
-      panel.append(dayHeader, indicator, dayList);
+      dayList.classList.add("agenda-time-grid-events");
+      timeGrid.append(timeAxis, dayList);
+      panel.append(dayHeader, timeGrid, indicator);
       weekOverview.append(panel);
       dayLists.set(day, dayList);
       dayPanels.set(day, panel);
       dayIndicators.set(day, indicator);
+    });
+
+    const columnWidthStorageKey = "agenda-day-column-widths";
+    let savedColumnWidths = null;
+    try {
+      const savedWidths = JSON.parse(
+        window.localStorage.getItem(columnWidthStorageKey) || "null",
+      );
+      if (
+        Array.isArray(savedWidths) &&
+        savedWidths.length === orderedWeekdays.length &&
+        savedWidths.every(
+          (width) =>
+            Number.isFinite(width) && width >= 180 && width <= 900,
+        )
+      ) {
+        savedColumnWidths = savedWidths;
+      }
+    } catch (error) {
+      console.warn("De dagkolombreedtes konden niet worden gelezen.", error);
+    }
+
+    function applyDayColumnWidths(widths) {
+      weekOverview.style.gridTemplateColumns = widths
+        .map((width) => `${width}px`)
+        .join(" ");
+    }
+
+    function saveDayColumnWidths(widths) {
+      try {
+        window.localStorage.setItem(
+          columnWidthStorageKey,
+          JSON.stringify(widths),
+        );
+      } catch (error) {
+        console.warn("De dagkolombreedtes konden niet worden bewaard.", error);
+      }
+    }
+
+    if (
+      savedColumnWidths &&
+      !window.matchMedia("(max-width: 900px)").matches
+    ) {
+      applyDayColumnWidths(savedColumnWidths);
+      weekOverview.style.overflowX = "auto";
+    }
+
+    dayPanels.forEach((panel, day) => {
+      const resizeHandle = panel.querySelector(
+        ".agenda-column-resize-handle",
+      );
+      let dragStart = null;
+
+      resizeHandle.addEventListener("pointerdown", (event) => {
+        if (
+          event.button !== 0 ||
+          window.matchMedia("(max-width: 900px)").matches
+        ) {
+          return;
+        }
+        event.preventDefault();
+        const dayIndex = orderedWeekdays.indexOf(day);
+        const widths = Array.from(dayPanels.values(), (dayPanel) =>
+          dayPanel.getBoundingClientRect().width,
+        );
+        dragStart = {
+          pointerId: event.pointerId,
+          x: event.clientX,
+          width: widths[dayIndex],
+          widths,
+        };
+        panel.classList.add("is-resizing");
+        resizeHandle.setPointerCapture(event.pointerId);
+      });
+
+      resizeHandle.addEventListener("pointermove", (event) => {
+        if (dragStart?.pointerId !== event.pointerId) {
+          return;
+        }
+        const dayIndex = orderedWeekdays.indexOf(day);
+        const widths = [...dragStart.widths];
+        widths[dayIndex] = Math.max(
+          180,
+          Math.min(
+            900,
+            Math.round(dragStart.width + event.clientX - dragStart.x),
+          ),
+        );
+        applyDayColumnWidths(widths);
+        weekOverview.style.overflowX = "auto";
+        updateTimeIndicator();
+      });
+
+      resizeHandle.addEventListener("pointerup", (event) => {
+        if (dragStart?.pointerId !== event.pointerId) {
+          return;
+        }
+        const dayIndex = orderedWeekdays.indexOf(day);
+        const widths = [...dragStart.widths];
+        widths[dayIndex] = Math.max(
+          180,
+          Math.min(
+            900,
+            Math.round(dragStart.width + event.clientX - dragStart.x),
+          ),
+        );
+        applyDayColumnWidths(widths);
+        weekOverview.style.overflowX = "auto";
+        saveDayColumnWidths(widths);
+        dragStart = null;
+        panel.classList.remove("is-resizing");
+        updateTimeIndicator();
+      });
+
+      resizeHandle.addEventListener("pointercancel", () => {
+        if (dragStart) {
+          applyDayColumnWidths(dragStart.widths);
+        }
+        dragStart = null;
+        panel.classList.remove("is-resizing");
+        updateTimeIndicator();
+      });
+
+      resizeHandle.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight"].includes(event.key)) {
+          return;
+        }
+        event.preventDefault();
+        const dayIndex = orderedWeekdays.indexOf(day);
+        const widths = Array.from(dayPanels.values(), (dayPanel) =>
+          Math.round(dayPanel.getBoundingClientRect().width),
+        );
+        widths[dayIndex] = Math.max(
+          180,
+          Math.min(
+            900,
+            widths[dayIndex] + (event.key === "ArrowRight" ? 40 : -40),
+          ),
+        );
+        applyDayColumnWidths(widths);
+        weekOverview.style.overflowX = "auto";
+        saveDayColumnWidths(widths);
+        updateTimeIndicator();
+      });
     });
 
     const weekStyle = document.createElement("style");
@@ -3616,29 +3796,34 @@ if (
       .agenda-week-navigation button:hover, .agenda-week-navigation button:focus-visible { background: #183153; color: #fff; }
       .agenda-week-navigation button:disabled { cursor: not-allowed; opacity: .55; }
       .agenda-week-label { min-width: 190px; color: #183153; text-align: center; }
-      .agenda-week-overview { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
+      .agenda-week-overview { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; overflow-x: auto; overscroll-behavior-x: contain; }
       .agenda-day-panel { position: relative; min-width: 0; padding: 12px; border: 1px solid #d6deea; border-radius: 10px; background: #fff; }
-      .agenda-day-header { display: flex; min-width: 0; flex-direction: column; align-items: stretch; gap: 5px; margin-bottom: 12px; }
-      .agenda-day-heading { order: 1; min-width: 0; margin: 0; color: #183153; font-size: 16px; }
+      .agenda-day-header { position: relative; display: flex; min-width: 0; flex-direction: column; align-items: stretch; gap: 5px; margin-bottom: 12px; }
+      .agenda-day-heading { order: 1; min-width: 0; margin: 0; color: #183153; font-size: 18px; }
+      .agenda-column-resize-handle { position: absolute; z-index: 15; top: 0; right: -17px; display: grid; width: 22px; height: 36px; place-items: center; padding: 0; border: 1px solid #d6deea; border-radius: 6px; background: #fff; color: #526174; cursor: col-resize; font: inherit; font-size: 18px; line-height: 1; touch-action: none; }
+      .agenda-column-resize-handle:hover, .agenda-column-resize-handle:focus-visible { border-color: #3978c5; background: #e8f1ff; color: #183153; outline: 2px solid rgb(57 120 197 / 25%); }
+      .agenda-day-panel.is-resizing { user-select: none; }
       .agenda-day-panel ul.agenda-all-day-list { order: 0; display: flex; min-width: 0; margin: 0; padding: 0; }
       .agenda-day-panel li.agenda-all-day-item { min-width: 0; padding: 5px 7px; font-size: 11px; }
       .agenda-all-day-item .agenda-item-time { display: none; }
       .agenda-all-day-item .agenda-item-title { display: block; overflow: hidden; font-size: 11px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
       .agenda-all-day-item .agenda-category-badge { display: none; }
-      .agenda-day-panel ul { min-width: 0; }
-      .agenda-day-panel li { overflow-wrap: anywhere; padding: 10px; font-size: 13px; }
-      .agenda-day-panel li.agenda-overlap-group { position: static; min-width: 0; padding: 0; border: 0; border-left: 0; border-radius: 0; background: transparent; box-shadow: none; }
-      .agenda-day-panel ul.agenda-overlap-items { display: grid; grid-template-columns: repeat(var(--agenda-overlap-columns), minmax(0, 1fr)); gap: 10px; }
-      .agenda-day-panel ul.agenda-overlap-items > li { min-width: 0; padding: 6px 4px; font-size: 10px; }
-      .agenda-overlap-items .agenda-item-time { display: block; margin-bottom: 3px; color: #183153; font-size: 10px; font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; }
-      .agenda-overlap-items .agenda-item-title { display: -webkit-box; overflow: hidden; font-size: 10px; line-height: 1.25; text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
-      .agenda-overlap-items .agenda-category-badge { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .agenda-day-panel li.agenda-item.planning-actief { position: relative; z-index: 12; order: -1; }
+      .agenda-time-grid { display: grid; min-width: 0; grid-template-columns: 46px minmax(0, 1fr); align-items: start; }
+      .agenda-time-axis, .agenda-day-panel ul.agenda-time-grid-events { position: relative; height: 1440px; }
+      .agenda-time-axis { border-top: 1px solid #e2e8f0; color: #64748b; font-size: 11px; }
+      .agenda-time-axis span { position: absolute; right: 5px; transform: translateY(-50%); }
+      .agenda-day-panel ul.agenda-time-grid-events { min-width: 0; display: block; margin: 0; padding: 0; border-top: 1px solid #e2e8f0; background: repeating-linear-gradient(to bottom, transparent 0, transparent 59px, #e2e8f0 59px, #e2e8f0 60px); touch-action: pan-y; }
+      .agenda-day-panel ul.agenda-time-grid-events > li.agenda-item { position: absolute; z-index: 1; min-width: 0; min-height: 20px; margin: 0; padding: 4px 6px; overflow: hidden; border-left-width: 3px; border-radius: 5px; font-size: 13px; line-height: 1.25; cursor: pointer; }
+      .agenda-day-panel ul.agenda-time-grid-events > li.agenda-item .agenda-item-time { display: block; font-size: 11px; font-weight: 700; }
+      .agenda-day-panel ul.agenda-time-grid-events > li.agenda-item .agenda-item-title { display: block; overflow: hidden; text-overflow: ellipsis; }
+      .agenda-day-panel ul.agenda-time-grid-events > li.agenda-holiday { display: none; }
+      .agenda-time-selection { position: absolute; z-index: 2; right: 3px; left: 3px; padding: 0; border: 1px solid #3978c5; border-radius: 5px; background: rgb(57 120 197 / 22%); box-shadow: none; pointer-events: none; }
+      .agenda-day-panel ul.agenda-time-grid-events > li.agenda-item.planning-actief { z-index: 12; }
+      .agenda-day-panel ul.agenda-time-grid-events > li.agenda-item.is-item-expanded { z-index: 20; width: min(250px, calc(100% - 6px)); height: auto !important; min-height: 76px; overflow: visible; }
+      body.dark-mode .agenda-time-axis { border-color: #374151; color: #9ca3af; }
+      body.dark-mode .agenda-day-panel ul.agenda-time-grid-events { border-color: #374151; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 59px, #374151 59px, #374151 60px); }
+      body.dark-mode .agenda-column-resize-handle { border-color: #374151; background: #1f2937; color: #d1d5db; }
       .agenda-day-panel li.agenda-item.is-overlap-expanded { position: absolute; z-index: 20; right: 0; left: 0; width: auto; padding: 10px; font-size: 13px; box-shadow: 0 6px 18px rgb(24 49 83 / 28%); }
-      .agenda-overlap-items .agenda-item.is-overlap-expanded .agenda-item-time { display: inline; margin: 0; font-size: inherit; }
-      .agenda-overlap-items .agenda-item.is-overlap-expanded .agenda-item-title { display: inline; overflow: visible; font-size: inherit; line-height: inherit; text-overflow: clip; -webkit-line-clamp: unset; }
-      body.dark-mode .agenda-day-panel li.agenda-overlap-group { border-color: transparent !important; border-left-color: transparent !important; background: transparent !important; box-shadow: none !important; }
-      body.dark-mode .agenda-overlap-items .agenda-item-time { color: #e5e7eb; }
       .agenda-detail-dialog { width: min(940px, calc(100vw - 32px)); max-width: none; max-height: min(780px, calc(100dvh - 32px)); padding: 0; overflow: hidden; border: 0; border-radius: 16px; background: #fff; color: #1f2937; box-shadow: 0 24px 80px rgb(15 23 42 / 35%); }
       .agenda-detail-dialog::backdrop { background: rgb(15 23 42 / 48%); backdrop-filter: blur(2px); }
       .agenda-detail-shell { display: grid; max-height: inherit; grid-template-rows: auto minmax(0, 1fr) auto; }
@@ -3678,7 +3863,8 @@ if (
       .agenda-search-field { flex-basis: 240px; }
       .agenda-category-badge { display: inline-block; margin: 5px 5px 0 0; padding: 2px 6px; border-radius: 999px; background: #e8f1ff; color: #183153; font-size: 11px; }
       .agenda-time-indicators { position: absolute; z-index: 30; inset: 0; pointer-events: none; }
-      .agenda-time-indicator { position: absolute; height: 2px; background: #e5484d; }
+      .agenda-time-indicator { position: absolute; height: 2px; background: #e5484d; box-shadow: 0 0 0 1px rgb(255 255 255 / 55%); }
+      .agenda-time-indicator::before { position: absolute; top: 50%; left: 0; width: 8px; height: 8px; border: 1px solid #fff; border-radius: 50%; background: #e5484d; content: ""; transform: translate(-50%, -50%); }
       .agenda-month-navigation { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
       .agenda-month-navigation button { min-height: 40px; padding: 8px 12px; border: 1px solid #d6deea; border-radius: 8px; background: #fff; color: #183153; cursor: pointer; font: inherit; font-weight: 600; }
       .agenda-month-navigation button:hover, .agenda-month-navigation button:focus-visible { background: #183153; color: #fff; }
@@ -3703,6 +3889,7 @@ if (
       body.dark-mode .agenda-category-badge { background: #273449; color: #e5e7eb; }
       @media (max-width: 900px) {
         body { width: 100%; padding: 16px; }
+        .agenda-column-resize-handle { display: none; }
         .agenda-week-navigation { gap: 6px; }
         .agenda-week-navigation button { padding: 8px; font-size: 13px; }
         .agenda-filters { gap: 8px; }
@@ -3711,7 +3898,7 @@ if (
         .agenda-month-navigation button { padding: 8px; font-size: 13px; }
         .agenda-week-label { order: -1; flex-basis: 100%; }
         .agenda-month-label { order: -1; flex-basis: 100%; }
-        .agenda-week-overview { grid-auto-columns: 100%; grid-auto-flow: column; grid-template-columns: none; gap: 0; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; }
+        .agenda-week-overview { grid-auto-columns: 100%; grid-auto-flow: column; grid-template-columns: none !important; gap: 0; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; }
         .agenda-week-overview::-webkit-scrollbar { display: none; }
         .agenda-day-panel { scroll-snap-align: start; }
         .agenda-day-panel li { font-size: 15px; }
@@ -3848,6 +4035,10 @@ if (
         } else if (isGroupedEvent) {
           item.classList.remove("is-overlap-expanded");
           item.style.removeProperty("top");
+        } else if (isExpanded) {
+          item.classList.add("is-item-expanded");
+        } else {
+          item.classList.remove("is-item-expanded");
         }
         actions.hidden = !isExpanded;
         item.setAttribute("aria-expanded", String(isExpanded));
@@ -3890,6 +4081,7 @@ if (
         }
         addAgendaItemDetailsAction(item, entry, day, match?.[2] || "");
       });
+      groupOverlappingItems(dayList);
     });
 
     function getDateForDay(day) {
@@ -4488,10 +4680,7 @@ if (
       dayPanel.querySelector(".agenda-all-day-list")?.remove();
 
       const allDayItems = [];
-      const groups = [];
-      let currentGroup = [];
-      let currentGroupEnd = -Infinity;
-
+      const timedItems = [];
       Array.from(dayList.children).forEach((item) => {
         const start = Number(item.dataset.start);
         const end = Number(item.dataset.end);
@@ -4499,22 +4688,7 @@ if (
           allDayItems.push(item);
           return;
         }
-        if (!Number.isFinite(start) || !Number.isFinite(end)) {
-          groups.push([item]);
-          currentGroup = [];
-          currentGroupEnd = -Infinity;
-          return;
-        }
-
-        if (start >= currentGroupEnd) {
-          currentGroup = [item];
-          groups.push(currentGroup);
-          currentGroupEnd = end;
-          return;
-        }
-
-        currentGroup.push(item);
-        currentGroupEnd = Math.max(currentGroupEnd, end);
+        timedItems.push(item);
       });
 
       if (allDayItems.length) {
@@ -4527,24 +4701,52 @@ if (
         dayPanel.querySelector(".agenda-day-header").prepend(allDayList);
       }
 
-      dayList.replaceChildren();
-      groups.forEach((group) => {
-        if (group.length === 1) {
-          dayList.append(group[0]);
+      dayList.replaceChildren(...timedItems);
+      const groups = [];
+      let group = [];
+      let groupEnd = -Infinity;
+      timedItems.forEach((item) => {
+        const start = Number(item.dataset.start);
+        let end = Number(item.dataset.end);
+        if (end <= start) {
+          end += 24 * 60;
+        }
+        if (!Number.isFinite(start) || !Number.isFinite(end)) {
+          item.style.top = "0px";
+          item.style.height = "30px";
+          item.style.left = "3px";
+          item.style.right = "3px";
           return;
         }
+        if (group.length && start >= groupEnd) {
+          groups.push(group);
+          group = [];
+          groupEnd = -Infinity;
+        }
+        group.push({ item, start, end });
+        groupEnd = Math.max(groupEnd, end);
+      });
+      if (group.length) {
+        groups.push(group);
+      }
 
-        const wrapper = document.createElement("li");
-        wrapper.className = "agenda-overlap-group";
-        const overlapList = document.createElement("ul");
-        overlapList.className = "agenda-overlap-items";
-        overlapList.style.setProperty(
-          "--agenda-overlap-columns",
-          String(group.length),
-        );
-        overlapList.append(...group);
-        wrapper.append(overlapList);
-        dayList.append(wrapper);
+      groups.forEach((overlappingItems) => {
+        const trackEnds = [];
+        const placements = [];
+        overlappingItems.forEach(({ item, start, end }) => {
+          let track = trackEnds.findIndex((trackEnd) => trackEnd <= start);
+          if (track < 0) {
+            track = trackEnds.length;
+          }
+          trackEnds[track] = end;
+          placements.push({ item, start, end, track });
+        });
+        placements.forEach(({ item, start, end, track }) => {
+          item.style.top = `${Math.max(0, start)}px`;
+          item.style.height = `${Math.max(18, Math.min(1440, end) - start)}px`;
+          item.style.left = `calc(${(track * 100) / trackEnds.length}% + 3px)`;
+          item.style.width = `calc(${100 / trackEnds.length}% - 6px)`;
+        });
       });
     }
 
@@ -5309,6 +5511,10 @@ if (
               } else if (isGroupedEvent) {
                 item.classList.remove("is-overlap-expanded");
                 item.style.removeProperty("top");
+              } else if (isExpanded) {
+                item.classList.add("is-item-expanded");
+              } else {
+                item.classList.remove("is-item-expanded");
               }
               actions.hidden = !isExpanded;
               item.setAttribute("aria-expanded", String(isExpanded));
@@ -5461,6 +5667,102 @@ if (
           "Afspraak toevoegen";
         ui.itemForm.querySelector("[data-cancel-edit]").hidden = true;
       }
+
+      function getGridMinute(dayList, clientY) {
+        const bounds = dayList.getBoundingClientRect();
+        return Math.max(
+          0,
+          Math.min(1439, Math.floor(clientY - bounds.top)),
+        );
+      }
+
+      function updateSelectionMarker(marker, start, end) {
+        marker.style.top = `${start}px`;
+        marker.style.height = `${Math.max(15, end - start)}px`;
+      }
+
+      dayLists.forEach((dayList, day) => {
+        let selection = null;
+        const removeSelectionMarker = () => {
+          selection?.marker.remove();
+          selection = null;
+        };
+        const updateSelection = (minute) => {
+          if (!selection) {
+            return;
+          }
+          const currentSlot = Math.floor(minute / 15) * 15;
+          const firstSlot = Math.floor(selection.anchor / 15) * 15;
+          const start = Math.min(firstSlot, currentSlot);
+          const end = Math.min(
+            1440,
+            Math.max(firstSlot, currentSlot) + 15,
+          );
+          selection.start = start;
+          selection.end = end;
+          updateSelectionMarker(selection.marker, start, end);
+        };
+        dayList.addEventListener("pointerdown", (event) => {
+          if (
+            event.button !== 0 ||
+            event.target.closest(".agenda-item")
+          ) {
+            return;
+          }
+          event.preventDefault();
+          selectDay(day);
+          const marker = document.createElement("li");
+          marker.className = "agenda-time-selection";
+          marker.setAttribute("aria-hidden", "true");
+          dayList.append(marker);
+          const minute = getGridMinute(dayList, event.clientY);
+          selection = {
+            anchor: minute,
+            end: minute,
+            marker,
+            pointerId: event.pointerId,
+            start: Math.floor(minute / 15) * 15,
+          };
+          updateSelection(minute);
+          dayList.setPointerCapture(event.pointerId);
+        });
+        dayList.addEventListener("pointermove", (event) => {
+          if (selection?.pointerId === event.pointerId) {
+            updateSelection(getGridMinute(dayList, event.clientY));
+          }
+        });
+        dayList.addEventListener("pointerup", (event) => {
+          if (selection?.pointerId !== event.pointerId) {
+            return;
+          }
+          const minute = getGridMinute(dayList, event.clientY);
+          updateSelection(minute);
+          const start = selection.start;
+          const end =
+            selection.end === start + 15 && minute === selection.anchor
+              ? Math.min(1440, start + 30)
+              : selection.end;
+          removeSelectionMarker();
+          if (!currentUser) {
+            showAccountMessage("Log in om een activiteit aan je agenda toe te voegen.");
+            ui.accountPanel.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+            return;
+          }
+          resetItemForm();
+          ui.itemForm.elements.namedItem("day").value = day;
+          ui.itemForm.elements.namedItem("start_time").value =
+            formatTime(start);
+          ui.itemForm.elements.namedItem("end_time").value =
+            end >= 1440 ? "23:59" : formatTime(end);
+          ui.itemForm.hidden = false;
+          ui.itemForm.scrollIntoView({ behavior: "smooth", block: "center" });
+          ui.itemForm.elements.namedItem("title").focus();
+        });
+        dayList.addEventListener("pointercancel", removeSelectionMarker);
+      });
 
       ui.addButton.addEventListener("click", () => {
         resetItemForm();
@@ -5819,21 +6121,20 @@ if (
         const timedItems = activeItems.filter(
           ({ item }) => !item.classList.contains("agenda-all-day-item"),
         );
-        const indicatorItems = timedItems.length ? timedItems : activeItems;
-        indicatorItems.forEach(({ item }) =>
+        timedItems.forEach(({ item }) =>
           item.classList.add("planning-actief"),
         );
-        const panelRect = panel.getBoundingClientRect();
-        indicatorItems.forEach(({ item, start, end }) => {
-          const elapsedFraction = (currentMinutes - start) / (end - start);
-          const itemRect = item.getBoundingClientRect();
+        if (isCurrentWeek && day === currentDay) {
+          const grid = panel.querySelector(".agenda-time-grid");
+          const panelRect = panel.getBoundingClientRect();
+          const gridRect = grid.getBoundingClientRect();
           const timeIndicator = document.createElement("div");
           timeIndicator.className = "agenda-time-indicator";
-          timeIndicator.style.left = `${itemRect.left - panelRect.left - panel.clientLeft + panel.scrollLeft}px`;
-          timeIndicator.style.width = `${itemRect.width}px`;
-          timeIndicator.style.top = `${itemRect.top - panelRect.top + panel.scrollTop + itemRect.height * elapsedFraction}px`;
+          timeIndicator.style.left = `${gridRect.left - panelRect.left - panel.clientLeft + panel.scrollLeft}px`;
+          timeIndicator.style.width = `${gridRect.width}px`;
+          timeIndicator.style.top = `${gridRect.top - panelRect.top - panel.clientTop + panel.scrollTop + currentMinutes}px`;
           indicator.append(timeIndicator);
-        });
+        }
       });
     }
 
